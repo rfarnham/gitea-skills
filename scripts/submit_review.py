@@ -2,7 +2,7 @@
 """Helper script to submit PR reviews on Gitea.
 
 Usage:
-    python scripts/submit_review.py [pr_index] [APPROVED|REQUEST_CHANGES|COMMENT] "Review body"
+    ./scripts/submit_review.py [pr_index] [APPROVED|REQUEST_CHANGES|COMMENT] "Review body"
 """
 
 import sys

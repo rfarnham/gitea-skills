@@ -2,27 +2,24 @@
 """Launch a Developer Agent to implement a task on a new branch.
 
 Usage:
-    python scripts/run_developer.py --task "Add a fibonacci function with tests"
-    python scripts/run_developer.py --task "Fix the parser bug" --branch agent/42-fix-parser
-    python scripts/run_developer.py --pr 3 --revise   # address review feedback on existing PR
+    ./scripts/run_developer.py --task "Add a fibonacci function with tests"
+    ./scripts/run_developer.py --task "Fix the parser bug" --branch agent/42-fix-parser
+    ./scripts/run_developer.py --pr 3 --revise   # address review feedback on existing PR
 """
 
 import argparse
 import asyncio
 import os
-import re
-import subprocess
 import sys
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 AGENTIC_DIR = PROJECT_DIR / ".agentic_dev"
-WORKTREES_DIR = AGENTIC_DIR / "worktrees"
 
+# Allow importing skills/agentic_dev modules
+sys.path.insert(0, str(PROJECT_DIR / "skills" / "agentic_dev"))
+import gitea_skills
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def load_env(path):
     """Parse a KEY=VALUE env file into a dict."""
@@ -38,47 +35,10 @@ def load_env(path):
 
 def slugify(text, max_len=40):
     """Turn a task description into a branch-safe slug."""
+    import re
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug[:max_len]
 
-
-def create_worktree(branch):
-    """Create a git worktree for the given branch."""
-    dest = WORKTREES_DIR / branch.replace("/", "__")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        ["git", "worktree", "add", str(dest), "-b", branch],
-        cwd=PROJECT_DIR, check=True,
-    )
-    return dest
-
-
-def checkout_existing_worktree(branch):
-    """Create a worktree for an existing remote branch."""
-    dest = WORKTREES_DIR / branch.replace("/", "__")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    # Fetch latest and create worktree from existing branch
-    subprocess.run(["git", "fetch", "origin"], cwd=PROJECT_DIR, check=True)
-    subprocess.run(
-        ["git", "worktree", "add", str(dest), branch],
-        cwd=PROJECT_DIR, check=True,
-    )
-    return dest
-
-
-def remove_worktree(branch):
-    """Remove the worktree for the given branch."""
-    dest = WORKTREES_DIR / branch.replace("/", "__")
-    if dest.exists():
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(dest)],
-            cwd=PROJECT_DIR, check=False,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 async def run_developer(task, branch, revise_pr=None):
     # Import here so the script gives a clear error if not installed
@@ -96,21 +56,14 @@ async def run_developer(task, branch, revise_pr=None):
     gitea_url = tokens.get("GITEA_URL", "http://localhost:3000")
     repo_owner = tokens.get("REPO_OWNER", "admin")
     repo_name = tokens.get("REPO_NAME", "friendly-davinci")
-    dev_token = tokens.get("DEVELOPER_AGENT_TOKEN", "")
     test_cmd = config_env.get("TEST_COMMAND", "pytest")
 
-    # Set up worktree
-    if revise_pr:
-        worktree_dir = checkout_existing_worktree(branch)
-    else:
-        worktree_dir = create_worktree(branch)
-
-    # Configure the git remote inside the worktree to use agent credentials
-    subprocess.run(
-        ["git", "remote", "set-url", "origin",
-         f"http://developer-agent:{dev_token}@localhost:3000/{repo_owner}/{repo_name}.git"],
-        cwd=worktree_dir, check=True,
-    )
+    # 1. Use the skill tool to set up the worktree
+    print(f"Setting up isolated worktree for branch '{branch}'...")
+    gitea_skills.worktree_create(branch)
+    
+    # Calculate the worktree directory path
+    worktree_dir = AGENTIC_DIR / "worktrees" / branch.replace("/", "__")
 
     # Load agent guidelines
     guidelines = (PROJECT_DIR / "AGENT_GUIDELINES.md").read_text()
@@ -118,17 +71,21 @@ async def run_developer(task, branch, revise_pr=None):
     # Build the agent prompt
     if revise_pr:
         prompt = (
-            f"You are revising PR #{revise_pr} on branch '{branch}'.\n"
-            f"Read the review comments from the Gitea API and address them.\n"
-            f"After fixing, commit and push."
+            f"You are revising PR #{revise_pr} on branch '{branch}' in {worktree_dir}.\n"
+            f"1. Fetch the review comments using Gitea API or inspect files.\n"
+            f"2. Fix the issues inside the worktree and run tests using: {test_cmd}.\n"
+            f"3. Commit the changes.\n"
+            f"4. Push your changes to the remote branch.\n"
+            f"5. Check the status of Gitea CI using 'ci_get_status'. If it passes, inform the user you are finished and wait for human review (DO NOT merge!)."
         )
     else:
         prompt = (
-            f"Implement the following task:\n\n{task}\n\n"
-            f"You are on branch '{branch}'. After implementing and testing:\n"
-            f"1. Commit with a conventional commit message.\n"
-            f"2. Push to origin.\n"
-            f"3. Open a PR via the Gitea API targeting 'main'."
+            f"Implement the following task inside the workspace {worktree_dir}:\n\n{task}\n\n"
+            f"After implementing the changes:\n"
+            f"1. Run tests using: {test_cmd}. Ensure they pass.\n"
+            f"2. Commit the changes with a conventional commit message.\n"
+            f"3. Push your branch and open a PR targeting 'master' using the 'pr_create' tool.\n"
+            f"4. Poll the Gitea CI build status using the 'ci_get_status' tool. If it passes, stop and inform the user you are waiting for human review."
         )
 
     system_instructions = f"""\
@@ -136,20 +93,27 @@ You are a Developer Agent working in this repository: {worktree_dir}
 
 {guidelines}
 
-Your identity:
+Your identity and environment info:
 - Gitea username: developer-agent
-- API token: {dev_token}
 - Gitea URL: {gitea_url}
 - Repo owner: {repo_owner}
 - Repo name: {repo_name}
 - Test command: {test_cmd}
 - Branch: {branch}
+
+You have native tools registered to interact with Gitea and Git worktrees. Use them as needed.
 """
 
     agent_config = LocalAgentConfig(
         system_instructions=system_instructions,
         workspaces=[str(worktree_dir)],
         policies=[policy.allow_all()],
+        skills_paths=[str(PROJECT_DIR / "skills" / "agentic_dev")],
+        tools=[
+            gitea_skills.pr_create,
+            gitea_skills.ci_get_status,
+            gitea_skills.worktree_remove
+        ],
     )
 
     try:
@@ -157,8 +121,9 @@ Your identity:
             response = await agent.chat(prompt)
             print(await response.text())
     finally:
-        print(f"\nWorktree at: {worktree_dir}")
-        print("Run 'git worktree remove <path>' after the PR is merged.")
+        print(f"\nWorktree is located at: {worktree_dir}")
+        print("Once the PR has been merged by the human, run the cleanup tool:")
+        print(f"  ./scripts/worktree_helper.py remove {branch}")
 
 
 def main():
