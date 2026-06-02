@@ -25,7 +25,7 @@ jobs:
         run: |
           if [ -f pytest.ini ] || [ -f pyproject.toml ] || [ -d tests ]; then
             pip install pytest
-            pytest
+            python -m pytest
           else
             echo "No test configuration found. Skipping."
           fi
