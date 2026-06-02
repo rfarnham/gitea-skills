@@ -1,2 +1,4 @@
 # Agent orchestration
 google-antigravity
+pydantic
+
