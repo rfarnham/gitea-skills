@@ -91,7 +91,7 @@ done
 create_user() {
     local user="$1" pass="$2" email="$3" admin_flag="${4:-}"
     info "Creating user '$user'..."
-    if docker exec gitea gitea admin user create \
+    if docker exec -u git gitea gitea admin user create \
         --username "$user" \
         --password "$pass" \
         --email "$email" \
@@ -124,7 +124,7 @@ create_api_token() {
         "$GITEA_URL/api/v1/users/$user/tokens" \
         -u "$user:$pass" \
         -H "Content-Type: application/json" \
-        -d "{\"name\": \"$name\"}")
+        -d "{\"name\": \"$name\", \"scopes\": [\"all\"]}")
 
     # Extract the token value (field name varies by Gitea version)
     python3 -c "
@@ -212,7 +212,7 @@ git push -u origin "$CURRENT_BRANCH" 2>/dev/null \
 # 7. Register and start the CI runner
 # ---------------------------------------------------------------------------
 info "Generating runner registration token..."
-RUNNER_TOKEN=$(docker exec gitea gitea actions generate-runner-token 2>/dev/null || echo "")
+RUNNER_TOKEN=$(docker exec -u git gitea gitea actions generate-runner-token 2>/dev/null || echo "")
 
 if [ -n "$RUNNER_TOKEN" ]; then
     echo "GITEA_RUNNER_REGISTRATION_TOKEN=$RUNNER_TOKEN" > "$AGENTIC_DIR/runner.env"

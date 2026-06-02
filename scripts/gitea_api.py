@@ -64,7 +64,7 @@ def create_token(username, password, token_name):
         "POST",
         f"/users/{username}/tokens",
         basic_auth=(username, password),
-        data={"name": token_name},
+        data={"name": token_name, "scopes": ["all"]},
     )
 
 
