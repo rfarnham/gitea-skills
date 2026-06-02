@@ -1,0 +1,11 @@
+# Agentic dev loop data (Gitea state, tokens, worktrees)
+.agentic_dev/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# OS
+.DS_Store

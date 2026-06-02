@@ -1,0 +1,44 @@
+services:
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    environment:
+      # Skip the manual install wizard
+      - GITEA__security__INSTALL_LOCK=true
+      # Database
+      - GITEA__database__DB_TYPE=sqlite3
+      # Server
+      - GITEA__server__ROOT_URL=http://localhost:3000/
+      - GITEA__server__HTTP_PORT=3000
+      - GITEA__server__SSH_PORT=2222
+      # Disable public registration (users are created by setup script)
+      - GITEA__service__DISABLE_REGISTRATION=true
+      # Enable Gitea Actions for CI
+      - GITEA__actions__ENABLED=true
+    ports:
+      - "3000:3000"
+      - "2222:22"
+    volumes:
+      - ./.agentic_dev/gitea_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/v1/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  runner:
+    image: gitea/act_runner:latest
+    container_name: gitea-runner
+    depends_on:
+      gitea:
+        condition: service_healthy
+    env_file:
+      - ./.agentic_dev/runner.env
+    environment:
+      - GITEA_INSTANCE_URL=http://gitea:3000
+    volumes:
+      - ./.agentic_dev/runner_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
