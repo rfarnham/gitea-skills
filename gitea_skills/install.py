@@ -38,12 +38,12 @@ def run_install(target_dir: str = "."):
     # 1. Create .agentic_dev directory and templates
     agentic_dir.mkdir(parents=True, exist_ok=True)
     
-    tokens_path = agentic_dir / "tokens.env"
+    tokens_path = Path.home() / ".gitea_skills.env"
     if not tokens_path.exists():
         tokens_path.write_text(TOKENS_TEMPLATE)
-        print(f"  Created: {tokens_path}")
+        print(f"  Created: {tokens_path} (Global configuration)")
     else:
-        print(f"  Exists:  {tokens_path} (skipped)")
+        print(f"  Exists:  {tokens_path} (Global configuration skipped)")
     
     config_path = agentic_dir / "config.env"
     if not config_path.exists():
@@ -80,7 +80,7 @@ def run_install(target_dir: str = "."):
     
     print("")
     print("Setup complete! Next steps:")
-    print(f"  1. Edit {tokens_path} with your Gitea tokens")
+    print(f"  1. Edit {tokens_path} with your Gitea tokens (if not already done)")
     print(f"  2. Edit {config_path} with your test command")
     print("  3. The gitea-skills plugin is now globally available to Antigravity agents")
 
