@@ -74,8 +74,7 @@ echo "Creating Pull Request on GitHub..."
 python3 "$PACKAGE_DIR/github_api.py" \
     --head "$SYNC_BRANCH" \
     --base "$CURRENT_BRANCH" \
-    --title "Sync $CURRENT_BRANCH from Gitea" \
-    --body "Automated Pull Request syncing changes from local Gitea."
+    --title "Sync $CURRENT_BRANCH from Gitea"
 
 echo ""
 echo "Done! Code pushed and Pull Request processed for: $GITHUB_URL"
