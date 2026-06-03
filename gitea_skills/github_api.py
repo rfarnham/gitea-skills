@@ -37,8 +37,60 @@ def get_git_remote_url():
     except subprocess.CalledProcessError:
         return None
 
+def check_existing_pull_request(owner: str, repo: str, token: str, head: str, base: str):
+    """Check if an open pull request already exists from head to base."""
+    # head must be formatted as owner:head for the API query
+    url = f"https://api.github.com/repos/{owner}/{repo}/pulls?head={owner}:{head}&base={base}&state=open"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json"
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            prs = json.loads(resp.read().decode())
+            if prs and isinstance(prs, list):
+                return prs[0]
+    except Exception as e:
+        print(f"Warning: Failed to check for existing pull requests: {e}", file=sys.stderr)
+    return None
+
+def update_pull_request(owner: str, repo: str, token: str, number: int, title: str, body: str):
+    """Call GitHub REST API to update an existing pull request."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "title": title,
+        "body": body
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=data, headers=headers, method="PATCH")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            res_data = json.loads(resp.read().decode())
+            print(f"Pull request updated successfully on GitHub!")
+            print(f"PR URL: {res_data.get('html_url')}")
+            return True
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print(f"Failed to update Pull Request: {error_body}", file=sys.stderr)
+        return False
+
 def create_pull_request(owner: str, repo: str, token: str, head: str, base: str, title: str, body: str):
-    """Call GitHub REST API to create a pull request."""
+    """Call GitHub REST API to create a pull request (or update if already exists)."""
+    existing = check_existing_pull_request(owner, repo, token, head, base)
+    if existing:
+        number = existing.get("number")
+        print(f"Found existing open Pull Request #{number} on GitHub. Updating description...")
+        return update_pull_request(owner, repo, token, number, title, body)
+
     url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
     headers = {
         "Authorization": f"Bearer {token}",
