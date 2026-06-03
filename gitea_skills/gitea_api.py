@@ -152,6 +152,21 @@ def submit_review(token, owner, repo, index, body, event, comments=None):
     )
 
 
+def get_pr_reviews(token, owner, repo, index):
+    """List reviews for a pull request."""
+    return _request("GET", f"/repos/{owner}/{repo}/pulls/{index}/reviews", token)
+
+
+def get_review_comments(token, owner, repo, index, review_id):
+    """List comments for a specific PR review."""
+    return _request("GET", f"/repos/{owner}/{repo}/pulls/{index}/reviews/{review_id}/comments", token)
+
+
+def get_pr_comments(token, owner, repo, index):
+    """List general comments (issue comments) for a pull request."""
+    return _request("GET", f"/repos/{owner}/{repo}/issues/{index}/comments", token)
+
+
 # ---------------------------------------------------------------------------
 # Commit statuses
 # ---------------------------------------------------------------------------

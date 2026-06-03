@@ -13,6 +13,8 @@ import urllib.error
 from pathlib import Path
 
 from gitea_skills import github_auth
+from gitea_skills import gitea_api
+from gitea_skills.core import _load_env, _get_project_dir
 
 def parse_github_url(url: str):
     """Extract owner and repo name from GitHub URL (SSH or HTTPS)."""
@@ -81,6 +83,176 @@ def create_pull_request(owner: str, repo: str, token: str, head: str, base: str,
             print(f"GitHub API Error {e.code}: {error_body}", file=sys.stderr)
         return False
 
+def get_merged_pr_metadata(base_branch="main"):
+    """Gathers merged Gitea PR details, comments, and reviews since the last sync."""
+    try:
+        env = _load_env()
+    except Exception as e:
+        print(f"Warning: Could not load Gitea environment settings: {e}", file=sys.stderr)
+        return ""
+
+    gitea_url = env.get("GITEA_URL", "http://localhost:3000")
+    token = env.get("ADMIN_TOKEN") or env.get("DEVELOPER_AGENT_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME")
+    
+    if not repo:
+        print("Warning: Gitea REPO_NAME not configured, skipping Gitea metadata capture.", file=sys.stderr)
+        return ""
+
+    gitea_api.GITEA_URL = gitea_url
+    project_dir = _get_project_dir()
+
+    # 1. Fetch github remote to ensure we have current remote tracking branches
+    import subprocess
+    print("Fetching from 'github' remote...")
+    subprocess.run(["git", "fetch", "github"], cwd=str(project_dir), capture_output=True)
+
+    # 2. Find commit differences between github/{base_branch} and HEAD
+    commit_shas = []
+    commit_messages = []
+    try:
+        # Get commit SHAs and messages
+        res = subprocess.run(
+            ["git", "log", f"github/{base_branch}..HEAD", "--format=%H %s"],
+            cwd=str(project_dir), capture_output=True, text=True, check=True
+        )
+        for line in res.stdout.strip().splitlines():
+            if line:
+                sha, msg = line.split(" ", 1)
+                commit_shas.append(sha)
+                commit_messages.append(msg)
+    except subprocess.CalledProcessError:
+        # Fallback: if github tracking branch is not found, check the last 20 commits
+        try:
+            res = subprocess.run(
+                ["git", "log", "-n", "20", "--format=%H %s"],
+                cwd=str(project_dir), capture_output=True, text=True, check=True
+            )
+            for line in res.stdout.strip().splitlines():
+                if line:
+                    sha, msg = line.split(" ", 1)
+                    commit_shas.append(sha)
+                    commit_messages.append(msg)
+        except subprocess.CalledProcessError:
+            pass
+
+    # 3. Extract Gitea PR numbers from commit messages
+    pr_indices = set()
+    for msg in commit_messages:
+        # Search for (#<number>) or similar
+        match = re.search(r"#(\d+)", msg)
+        if match:
+            pr_indices.add(int(match.group(1)))
+
+    # 4. Fetch Gitea closed pull requests and cross-reference
+    matching_prs = []
+    try:
+        closed_prs = gitea_api.list_pull_requests(token, owner, repo, state="closed") or []
+        for pr in closed_prs:
+            if not pr.get("merged"):
+                continue
+            pr_idx = pr.get("number")
+            sha = pr.get("merge_commit_sha") or pr.get("merged_commit_id")
+            
+            # Match if the PR index is in our parsed list OR its merge SHA matches one of our local commit SHAs
+            if pr_idx in pr_indices or (sha and sha in commit_shas):
+                matching_prs.append(pr)
+    except Exception as e:
+        print(f"Warning: Could not retrieve PR list from Gitea: {e}", file=sys.stderr)
+
+    # 5. Fallback: If no matching PRs were found, fetch the single most recently merged PR
+    if not matching_prs:
+        try:
+            closed_prs = gitea_api.list_pull_requests(token, owner, repo, state="closed") or []
+            merged_prs = [pr for pr in closed_prs if pr.get("merged")]
+            if merged_prs:
+                # Sort by merged_at descending if available, or number descending
+                merged_prs.sort(key=lambda p: p.get("merged_at") or "", reverse=True)
+                matching_prs.append(merged_prs[0])
+        except Exception as e:
+            print(f"Warning: Could not retrieve recently merged PR from Gitea: {e}", file=sys.stderr)
+
+    # If still no PRs found, return empty
+    if not matching_prs:
+        return ""
+
+    # Sort matching PRs by index ascending
+    matching_prs.sort(key=lambda p: p.get("number", 0))
+
+    # 6. Gather details, comments, and reviews for each PR and build markdown
+    markdown_sections = []
+    for pr in matching_prs:
+        idx = pr.get("number")
+        title = pr.get("title", "Untitled PR")
+        body = pr.get("body") or "No description provided."
+        url = pr.get("html_url", "")
+        author = pr.get("user", {}).get("username") or pr.get("user", {}).get("login") or "unknown"
+        merged_at = pr.get("merged_at", "")
+
+        section = []
+        section.append(f"## Gitea PR [#{idx}]({url}): {title}")
+        section.append(f"- **Author:** @{author}")
+        if merged_at:
+            section.append(f"- **Merged At:** {merged_at}")
+        section.append("\n### Description\n" + body)
+
+        # Gather general comments
+        try:
+            comments = gitea_api.get_pr_comments(token, owner, repo, idx) or []
+            # Gitea issues comments may include system actions or empty ones, filter them
+            user_comments = [c for c in comments if c.get("body") and not c.get("body").startswith("merged commit")]
+            if user_comments:
+                section.append("\n### Discussion & Comments")
+                for c in user_comments:
+                    c_author = c.get("user", {}).get("username") or c.get("user", {}).get("login") or "unknown"
+                    c_time = c.get("created_at", "")
+                    c_body = c.get("body", "").strip()
+                    # Indent body to format nicely as a blockquote
+                    blockquote_body = "\n".join(f"> {line}" for line in c_body.splitlines())
+                    section.append(f"- **@{c_author}** ({c_time}):\n{blockquote_body}")
+        except Exception as e:
+            print(f"Warning: Could not retrieve comments for Gitea PR #{idx}: {e}", file=sys.stderr)
+
+        # Gather reviews and review comments
+        try:
+            reviews = gitea_api.get_pr_reviews(token, owner, repo, idx) or []
+            if reviews:
+                section.append("\n### Review Activity")
+                for r in reviews:
+                    r_author = r.get("user", {}).get("username") or r.get("user", {}).get("login") or "unknown"
+                    r_state = r.get("state", "COMMENT")
+                    r_body = r.get("body", "").strip()
+                    r_time = r.get("submitted_at", "")
+                    
+                    review_msg = f"- **@{r_author}** ({r_state} review at {r_time})"
+                    if r_body:
+                        blockquote_body = "\n".join(f"> {line}" for line in r_body.splitlines())
+                        review_msg += f":\n{blockquote_body}"
+                    section.append(review_msg)
+                    
+                    # Fetch inline comments for this specific review
+                    r_id = r.get("id")
+                    if r_id:
+                        try:
+                            r_comments = gitea_api.get_review_comments(token, owner, repo, idx, r_id) or []
+                            for rc in r_comments:
+                                rc_body = rc.get("body", "").strip()
+                                rc_path = rc.get("path", "")
+                                rc_pos = rc.get("position") or rc.get("new_position") or "?"
+                                if rc_body:
+                                    rc_blockquote = "\n".join(f"  > {line}" for line in rc_body.splitlines())
+                                    section.append(f"  - *In `{rc_path}` line {rc_pos}*:\n{rc_blockquote}")
+                        except Exception as e:
+                            print(f"Warning: Could not retrieve comments for review {r_id}: {e}", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Could not retrieve reviews for Gitea PR #{idx}: {e}", file=sys.stderr)
+
+        markdown_sections.append("\n".join(section))
+
+    full_markdown = "\n\n---\n\n".join(markdown_sections)
+    return full_markdown
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Create a Pull Request on GitHub")
@@ -107,7 +279,17 @@ def main():
         sys.exit(1)
 
     title = args.title or f"sync: merge {args.head} into {args.base}"
-    body = args.body or "Automated pull request to sync Gitea changes to GitHub."
+    
+    # Try to fetch Gitea PR metadata if no custom body is provided
+    gitea_metadata = ""
+    if not args.body:
+        print("Fetching merged PR metadata from Gitea...")
+        gitea_metadata = get_merged_pr_metadata(args.base)
+        
+    if gitea_metadata:
+        body = f"Automated Pull Request syncing changes from local Gitea.\n\n# Sync Gitea Metadata\n\n{gitea_metadata}"
+    else:
+        body = args.body or "Automated pull request to sync Gitea changes to GitHub."
 
     success = create_pull_request(
         owner=owner,
