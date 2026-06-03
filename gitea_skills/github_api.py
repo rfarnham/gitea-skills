@@ -12,10 +12,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-# Insert scripts folder in path to import check_keychain
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-import github_auth
+from gitea_skills import github_auth
 
 def parse_github_url(url: str):
     """Extract owner and repo name from GitHub URL (SSH or HTTPS)."""

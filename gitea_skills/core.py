@@ -1,17 +1,25 @@
+import os
 import sys
 import subprocess
 from pathlib import Path
 
-# Setup paths so we can import gitea_api from scripts
-SKILL_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = SKILL_DIR.parent.parent
-AGENTIC_DIR = PROJECT_DIR / ".agentic_dev"
+from gitea_skills import gitea_api
 
-sys.path.insert(0, str(PROJECT_DIR / "scripts"))
-import gitea_api
+def _get_project_dir() -> Path:
+    """Resolve the active project directory.
+    
+    Priority: GITEA_SKILLS_PROJECT_DIR env var > cwd.
+    """
+    env_dir = os.environ.get("GITEA_SKILLS_PROJECT_DIR")
+    if env_dir:
+        return Path(env_dir).resolve()
+    return Path.cwd().resolve()
+
+def _get_agentic_dir() -> Path:
+    return _get_project_dir() / ".agentic_dev"
 
 def _load_env():
-    path = AGENTIC_DIR / "tokens.env"
+    path = _get_agentic_dir() / "tokens.env"
     env = {}
     if path.exists():
         for line in path.read_text().splitlines():
@@ -34,18 +42,18 @@ def worktree_create(branch: str) -> str:
     repo_owner = env.get("REPO_OWNER", "admin")
     repo_name = env.get("REPO_NAME", "friendly-davinci")
 
-    dest = AGENTIC_DIR / "worktrees" / branch.replace("/", "__")
+    dest = _get_agentic_dir() / "worktrees" / branch.replace("/", "__")
     dest.parent.mkdir(parents=True, exist_ok=True)
     
     # Check if branch exists on origin
-    res = subprocess.run(["git", "ls-remote", "--heads", "origin", branch], cwd=str(PROJECT_DIR), capture_output=True, text=True)
+    res = subprocess.run(["git", "ls-remote", "--heads", "origin", branch], cwd=str(_get_project_dir()), capture_output=True, text=True)
     if branch in res.stdout:
         # Fetch and checkout existing remote branch
-        subprocess.run(["git", "fetch", "origin"], cwd=str(PROJECT_DIR), check=True)
-        subprocess.run(["git", "worktree", "add", str(dest), branch], cwd=str(PROJECT_DIR), check=True)
+        subprocess.run(["git", "fetch", "origin"], cwd=str(_get_project_dir()), check=True)
+        subprocess.run(["git", "worktree", "add", str(dest), branch], cwd=str(_get_project_dir()), check=True)
     else:
         # Create a new branch
-        subprocess.run(["git", "worktree", "add", str(dest), "-b", branch], cwd=str(PROJECT_DIR), check=True)
+        subprocess.run(["git", "worktree", "add", str(dest), "-b", branch], cwd=str(_get_project_dir()), check=True)
         
     # Configure agent credentials in the worktree
     remote_url = f"http://developer-agent:{dev_token}@localhost:3000/{repo_owner}/{repo_name}.git"
@@ -59,9 +67,9 @@ def worktree_remove(branch: str) -> str:
     Args:
         branch: The git branch name of the worktree to remove (e.g. "agent/add-feature").
     """
-    dest = AGENTIC_DIR / "worktrees" / branch.replace("/", "__")
+    dest = _get_agentic_dir() / "worktrees" / branch.replace("/", "__")
     if dest.exists():
-        subprocess.run(["git", "worktree", "remove", "--force", str(dest)], cwd=str(PROJECT_DIR), check=True)
+        subprocess.run(["git", "worktree", "remove", "--force", str(dest)], cwd=str(_get_project_dir()), check=True)
         return f"Successfully removed worktree for branch '{branch}'."
     return f"No worktree found for branch '{branch}'."
 
@@ -80,11 +88,11 @@ def pr_create(branch: str, title: str, body: str) -> str:
     gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
     
     # First ensure everything is pushed
-    dest = AGENTIC_DIR / "worktrees" / branch.replace("/", "__")
+    dest = _get_agentic_dir() / "worktrees" / branch.replace("/", "__")
     if dest.exists():
         subprocess.run(["git", "push", "origin", branch], cwd=str(dest), check=True)
     else:
-        subprocess.run(["git", "push", "origin", branch], cwd=str(PROJECT_DIR), check=True)
+        subprocess.run(["git", "push", "origin", branch], cwd=str(_get_project_dir()), check=True)
         
     res = gitea_api.create_pull_request(
         token=token,
