@@ -1,0 +1,9 @@
+{
+  "name": "gitea-skills",
+  "version": "1.0.0",
+  "description": "Gitea agentic development loop — local AI-driven coding with Gitea, worktrees, and GitHub sync.",
+  "author": {
+    "name": "friendly-davinci"
+  },
+  "license": "MIT"
+}

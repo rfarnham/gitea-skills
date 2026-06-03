@@ -37,7 +37,8 @@ bash scripts/setup.sh
 # 3. Open Gitea in your browser
 open http://localhost:3000    # Login: admin / admin1234
 
-# 4. Install Python dependencies
+# 4. Install the gitea-skills package and dependencies
+pip install -e .
 pip install -r requirements.txt
 
 # 5. Launch a developer agent
@@ -47,13 +48,15 @@ pip install -r requirements.txt
 ./scripts/run_reviewer.py --pr 1
 
 # 7. Merge in Gitea, then push to GitHub
-bash scripts/push_to_github.sh git@github.com:<you>/<repo>.git
+gitea-skills push-to-github git@github.com:<you>/<repo>.git
 ```
 
 ## Project Structure
 
 ```
 .
+├── pyproject.toml              # Python package definition
+├── INSTALL.md                  # Detailed installation guide
 ├── docker-compose.yml          # Gitea + CI runner containers
 ├── requirements.txt            # Python dependencies
 ├── AGENT_GUIDELINES.md         # Instructions agents read and follow
@@ -61,12 +64,25 @@ bash scripts/push_to_github.sh git@github.com:<you>/<repo>.git
 ├── .gitea/
 │   └── workflows/
 │       └── ci.yml              # Gitea Actions CI workflow
+├── gitea_skills/               # Installable Python package
+│   ├── __init__.py             # Version, path helpers, re-exports
+│   ├── plugin.json             # Antigravity plugin manifest
+│   ├── core.py                 # Tool functions (worktree, PR, CI, review, merge)
+│   ├── gitea_api.py            # Gitea REST API client (stdlib only)
+│   ├── github_api.py           # GitHub REST API client
+│   ├── github_auth.py          # macOS Keychain credential management
+│   ├── github_credential_helper.py  # Git credential helper for HTTPS
+│   ├── cli.py                  # Unified CLI entry point
+│   ├── install.py              # Project setup / plugin registration
+│   └── skills/
+│       └── gitea_agentic_loop/
+│           ├── SKILL.md        # Agent-facing skill instructions
+│           └── scripts/
+│               └── push_to_github.sh
 ├── scripts/
 │   ├── setup.sh                # One-command bootstrap
-│   ├── gitea_api.py            # Gitea REST API wrapper (stdlib only)
 │   ├── run_developer.py        # Developer agent launcher
-│   ├── run_reviewer.py         # Reviewer agent launcher
-│   └── push_to_github.sh       # Push to GitHub helper
+│   └── run_reviewer.py         # Reviewer agent launcher
 └── .agentic_dev/               # (git-ignored) local state
     ├── tokens.env              # API tokens for each user
     ├── config.env              # User-editable config (test command, etc.)
@@ -106,14 +122,31 @@ The reviewer agent will:
 ./scripts/run_developer.py --pr 2 --revise --branch agent/42-add-validation
 ```
 
-### Push to GitHub
+### CLI Commands
+
+The `gitea-skills` CLI provides direct access to all operations:
 
 ```bash
-# First time: pass your GitHub repo URL
-bash scripts/push_to_github.sh git@github.com:username/repo.git
+# Worktree management
+gitea-skills worktree create agent/my-feature
+gitea-skills worktree remove agent/my-feature
 
-# After that, just:
-bash scripts/push_to_github.sh
+# Pull request management
+gitea-skills pr create --branch agent/my-feature --title "feat: add feature" --body "Description"
+gitea-skills pr diff 1
+gitea-skills pr details 1
+
+# Code review
+gitea-skills review submit 1 APPROVED "Looks good!"
+
+# Merge
+gitea-skills merge 1 --style squash
+
+# CI status
+gitea-skills ci status agent/my-feature
+
+# Push to GitHub
+gitea-skills push-to-github git@github.com:username/repo.git
 ```
 
 ### Tear down

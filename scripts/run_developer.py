@@ -16,8 +16,6 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 AGENTIC_DIR = PROJECT_DIR / ".agentic_dev"
 
-# Allow importing skills/agentic_dev modules
-sys.path.insert(0, str(PROJECT_DIR / "skills" / "agentic_dev"))
 import gitea_skills
 
 
@@ -49,6 +47,9 @@ async def run_developer(task, branch, revise_pr=None):
         print("ERROR: google-antigravity is not installed.", file=sys.stderr)
         print("Run: pip install google-antigravity", file=sys.stderr)
         sys.exit(1)
+
+    # Set the project dir so gitea_skills.core resolves paths correctly
+    os.environ["GITEA_SKILLS_PROJECT_DIR"] = str(PROJECT_DIR)
 
     tokens = load_env(AGENTIC_DIR / "tokens.env")
     config_env = load_env(AGENTIC_DIR / "config.env")
@@ -108,7 +109,7 @@ You have native tools registered to interact with Gitea and Git worktrees. Use t
         system_instructions=system_instructions,
         workspaces=[str(worktree_dir)],
         policies=[policy.allow_all()],
-        skills_paths=[str(PROJECT_DIR / "skills" / "agentic_dev")],
+        skills_paths=[str(gitea_skills.get_skills_path())],
         tools=[
             gitea_skills.pr_create,
             gitea_skills.ci_get_status,
@@ -123,7 +124,7 @@ You have native tools registered to interact with Gitea and Git worktrees. Use t
     finally:
         print(f"\nWorktree is located at: {worktree_dir}")
         print("Once the PR has been merged by the human, run the cleanup tool:")
-        print(f"  ./scripts/worktree_helper.py remove {branch}")
+        print(f"  gitea-skills worktree remove {branch}")
 
 
 def main():
