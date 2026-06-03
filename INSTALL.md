@@ -21,7 +21,9 @@ python -m gitea_skills.install --target-dir .
 
 ## Configuration
 
-After running the installer, edit `.agentic_dev/tokens.env` with your Gitea credentials:
+The installer sets up a **global configuration file** for your Gitea tokens so you only have to configure them once per machine.
+
+Edit `~/.gitea_skills.env` with your Gitea credentials:
 
 ```env
 GITEA_URL=http://localhost:3000
@@ -31,6 +33,8 @@ DEVELOPER_AGENT_TOKEN=<from setup.sh>
 REVIEWER_AGENT_TOKEN=<from setup.sh>
 ADMIN_TOKEN=<from setup.sh>
 ```
+
+You can optionally override these on a per-project basis by creating `.agentic_dev/tokens.env` in a specific project.
 
 ## Usage with SDK Agents
 
