@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitea-skills"
+version = "1.0.0"
+description = "Gitea agentic development loop — skills, tools, and CLI for local AI-driven development with Gitea and GitHub sync."
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.scripts]
+gitea-skills = "gitea_skills.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gitea_skills*"]
+
+[tool.setuptools.package-data]
+gitea_skills = ["plugin.json", "skills/**/*", "*.sh"]

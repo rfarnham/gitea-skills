@@ -11,9 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-# Allow importing skills/agentic_dev modules
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_DIR / "skills" / "agentic_dev"))
+
 import gitea_skills
 
 
@@ -37,6 +36,9 @@ async def run_reviewer(pr_number):
         print("ERROR: google-antigravity is not installed.", file=sys.stderr)
         print("Run: pip install google-antigravity", file=sys.stderr)
         sys.exit(1)
+
+    # Set the project dir so gitea_skills.core resolves paths correctly
+    os.environ["GITEA_SKILLS_PROJECT_DIR"] = str(PROJECT_DIR)
 
     agentic_dir = PROJECT_DIR / ".agentic_dev"
     tokens = load_env(agentic_dir / "tokens.env")
@@ -82,7 +84,7 @@ Set the review verdict parameter to one of:
     agent_config = LocalAgentConfig(
         system_instructions=system_instructions,
         policies=[policy.allow_all()],
-        skills_paths=[str(PROJECT_DIR / "skills" / "agentic_dev")],
+        skills_paths=[str(gitea_skills.get_skills_path())],
         tools=[gitea_skills.submit_review],
     )
 
