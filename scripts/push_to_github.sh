@@ -63,11 +63,20 @@ if ! "${PUSH_CMD[@]}" ls-remote github &>/dev/null; then
     exit 1
 fi
 
-# ── Push ─────────────────────────────────────────────────────────────────
+# ── Push to Sync Branch & Create Pull Request ────────────────────────────
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")"
-echo "Pushing $CURRENT_BRANCH branch to GitHub..."
+SYNC_BRANCH="sync/gitea-$CURRENT_BRANCH"
 
-"${PUSH_CMD[@]}" push github "$CURRENT_BRANCH" --tags
+echo "Pushing local $CURRENT_BRANCH branch to GitHub remote as $SYNC_BRANCH..."
+"${PUSH_CMD[@]}" push -f github "$CURRENT_BRANCH:refs/heads/$SYNC_BRANCH"
 
 echo ""
-echo "Done! Code pushed to: $GITHUB_URL"
+echo "Creating Pull Request on GitHub..."
+"$SCRIPT_DIR/github_api.py" \
+    --head "$SYNC_BRANCH" \
+    --base "$CURRENT_BRANCH" \
+    --title "Sync $CURRENT_BRANCH from Gitea" \
+    --body "Automated Pull Request syncing changes from local Gitea."
+
+echo ""
+echo "Done! Code pushed and Pull Request processed for: $GITHUB_URL"
