@@ -52,8 +52,9 @@ if ! git ls-remote github &>/dev/null; then
 fi
 
 # ── Push ─────────────────────────────────────────────────────────────────
-echo "Pushing main branch to GitHub..."
-git push github main --tags
+CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")"
+echo "Pushing $CURRENT_BRANCH branch to GitHub..."
+git push github "$CURRENT_BRANCH" --tags
 
 echo ""
 echo "Done! Code pushed to: $GITHUB_URL"
