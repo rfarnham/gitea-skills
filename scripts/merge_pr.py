@@ -2,7 +2,7 @@
 """Helper script to merge pull requests on Gitea.
 
 Usage:
-    python scripts/merge_pr.py [pr_index] [--style merge|rebase|rebase-merge|squash]
+    ./scripts/merge_pr.py [pr_index] [--style merge|rebase|rebase-merge|squash]
 """
 
 import sys

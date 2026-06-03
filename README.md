@@ -41,10 +41,10 @@ open http://localhost:3000    # Login: admin / admin1234
 pip install -r requirements.txt
 
 # 5. Launch a developer agent
-python scripts/run_developer.py --task "Create a calculator module with add, subtract, and tests"
+./scripts/run_developer.py --task "Create a calculator module with add, subtract, and tests"
 
 # 6. Review the PR in Gitea, or launch the reviewer agent
-python scripts/run_reviewer.py --pr 1
+./scripts/run_reviewer.py --pr 1
 
 # 7. Merge in Gitea, then push to GitHub
 bash scripts/push_to_github.sh git@github.com:<you>/<repo>.git
@@ -81,7 +81,7 @@ bash scripts/push_to_github.sh git@github.com:<you>/<repo>.git
 ### Create a new task
 
 ```bash
-python scripts/run_developer.py --task "Add input validation to the API"
+./scripts/run_developer.py --task "Add input validation to the API"
 ```
 
 The developer agent will:
@@ -92,7 +92,7 @@ The developer agent will:
 ### Review a PR
 
 ```bash
-python scripts/run_reviewer.py --pr 2
+./scripts/run_reviewer.py --pr 2
 ```
 
 The reviewer agent will:
@@ -103,7 +103,7 @@ The reviewer agent will:
 ### Revise after review feedback
 
 ```bash
-python scripts/run_developer.py --pr 2 --revise --branch agent/42-add-validation
+./scripts/run_developer.py --pr 2 --revise --branch agent/42-add-validation
 ```
 
 ### Push to GitHub

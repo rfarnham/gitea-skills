@@ -2,9 +2,9 @@
 """Helper script to check Gitea Actions CI statuses and fetch logs.
 
 Usage:
-    python scripts/check_ci.py [commit_sha_or_branch]
-    python scripts/check_ci.py --jobs [run_id]
-    python scripts/check_ci.py --logs [job_id]
+    ./scripts/check_ci.py [commit_sha_or_branch]
+    ./scripts/check_ci.py --jobs [run_id]
+    ./scripts/check_ci.py --logs [job_id]
 """
 
 import sys
