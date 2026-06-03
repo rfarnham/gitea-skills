@@ -15,8 +15,8 @@ All commands use the `gitea-skills` CLI tool which must be installed (`pip insta
 ## Prerequisites
 
 1. The `gitea-skills` package must be installed: `pip install gitea-skills`
-2. The target project must have a `.agentic_dev/tokens.env` file configured.
-   Run `python -m gitea_skills.install --target-dir <project>` to set up.
+2. The global Gitea tokens must be configured in `~/.gitea_skills.env`.
+   Run `python -m gitea_skills.install --target-dir <project>` to generate the template and project scaffolding.
 3. Docker must be running with the Gitea containers (see the project's `docker-compose.yml`).
 
 ## Core Rules

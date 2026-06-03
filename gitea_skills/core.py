@@ -19,14 +19,24 @@ def _get_agentic_dir() -> Path:
     return _get_project_dir() / ".agentic_dev"
 
 def _load_env():
-    path = _get_agentic_dir() / "tokens.env"
     env = {}
-    if path.exists():
-        for line in path.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
+    
+    def parse_file(file_path):
+        if file_path.exists():
+            for line in file_path.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    env[k.strip()] = v.strip()
+
+    # Read global tokens first
+    global_path = Path.home() / ".gitea_skills.env"
+    parse_file(global_path)
+
+    # Allow local project overrides
+    local_path = _get_agentic_dir() / "tokens.env"
+    parse_file(local_path)
+    
     return env
 
 # Expose tools as Python functions with clear docstrings:
