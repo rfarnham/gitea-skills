@@ -2,7 +2,7 @@
 # push_to_github.sh — Push the local main branch to your personal GitHub repo.
 #
 # Usage:
-#   scripts/push_to_github.sh [GITHUB_REPO_URL]
+#   ./scripts/push_to_github.sh [GITHUB_REPO_URL]
 #
 # If the 'github' remote doesn't exist yet, pass the URL as an argument
 # (e.g. git@github.com:user/repo.git) and this script will add it for you.
@@ -28,11 +28,8 @@ if ! git remote get-url github &>/dev/null; then
         echo "ERROR: No 'github' remote configured."
         echo ""
         echo "Add it by running one of:"
-        echo "  git remote add github git@github.com:<user>/<repo>.git   # SSH"
-        echo "  git remote add github https://github.com/<user>/<repo>.git  # HTTPS"
-        echo ""
-        echo "Or pass the URL directly to this script:"
-        echo "  $0 git@github.com:<user>/<repo>.git"
+        echo "  ./scripts/push_to_github.sh git@github.com:<user>/<repo>.git   # SSH"
+        echo "  ./scripts/push_to_github.sh https://github.com/<user>/<repo>.git  # HTTPS"
         exit 1
     fi
 fi
@@ -40,21 +37,37 @@ fi
 GITHUB_URL="$(git remote get-url github)"
 echo "GitHub remote: $GITHUB_URL"
 
+# ── Check & Acquire Credentials ──────────────────────────────────────────
+# If the URL is HTTPS, ensure we have the token stored in the Keychain.
+if [[ "$GITHUB_URL" =~ ^https:// ]]; then
+    # Run the secure auth helper to check or prompt for the token.
+    # We execute it in the current shell so it can prompt the user interactively.
+    "$SCRIPT_DIR/github_auth.py"
+fi
+
 # ── Verify authentication ───────────────────────────────────────────────
 echo "Verifying GitHub authentication..."
-if ! git ls-remote github &>/dev/null; then
+
+PUSH_CMD=("git")
+# If HTTPS, use our custom credential helper
+if [[ "$GITHUB_URL" =~ ^https:// ]]; then
+    PUSH_CMD+=("-c" "credential.helper=$SCRIPT_DIR/github_credential_helper.py")
+fi
+
+if ! "${PUSH_CMD[@]}" ls-remote github &>/dev/null; then
     echo "ERROR: Cannot authenticate with GitHub."
     echo ""
     echo "Ensure your credentials are configured:"
     echo "  • SSH:   ssh-keygen && add key to https://github.com/settings/keys"
-    echo "  • HTTPS: gh auth login  (GitHub CLI)"
+    echo "  • HTTPS: Verify your token matches and has 'repo' scopes."
     exit 1
 fi
 
 # ── Push ─────────────────────────────────────────────────────────────────
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")"
 echo "Pushing $CURRENT_BRANCH branch to GitHub..."
-git push github "$CURRENT_BRANCH" --tags
+
+"${PUSH_CMD[@]}" push github "$CURRENT_BRANCH" --tags
 
 echo ""
 echo "Done! Code pushed to: $GITHUB_URL"

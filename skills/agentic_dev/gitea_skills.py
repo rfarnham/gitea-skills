@@ -66,7 +66,7 @@ def worktree_remove(branch: str) -> str:
     return f"No worktree found for branch '{branch}'."
 
 def pr_create(branch: str, title: str, body: str) -> str:
-    """Opens a pull request on Gitea from the specified branch to 'master'.
+    """Opens a pull request on Gitea from the specified branch to 'main'.
 
     Args:
         branch: The head branch name containing the changes.
@@ -93,7 +93,7 @@ def pr_create(branch: str, title: str, body: str) -> str:
         title=title,
         body=body,
         head=branch,
-        base="master"
+        base="main"
     )
     return f"Pull request created successfully! PR Index: {res.get('number')}"
 

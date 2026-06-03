@@ -84,7 +84,7 @@ async def run_developer(task, branch, revise_pr=None):
             f"After implementing the changes:\n"
             f"1. Run tests using: {test_cmd}. Ensure they pass.\n"
             f"2. Commit the changes with a conventional commit message.\n"
-            f"3. Push your branch and open a PR targeting 'master' using the 'pr_create' tool.\n"
+            f"3. Push your branch and open a PR targeting 'main' using the 'pr_create' tool.\n"
             f"4. Poll the Gitea CI build status using the 'ci_get_status' tool. If it passes, stop and inform the user you are waiting for human review."
         )
 
