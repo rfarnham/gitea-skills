@@ -70,10 +70,16 @@ def create_pull_request(owner: str, repo: str, token: str, head: str, base: str,
             # Check if it's a duplicate PR error
             if "errors" in err_json:
                 for err in err_json["errors"]:
-                    if "A pull request already exists" in err.get("message", ""):
+                    msg = err.get("message", "")
+                    if "A pull request already exists" in msg:
                         print("A pull request already exists on GitHub for this branch.")
                         return True
+                    if "No commits between" in msg:
+                        print("No commits between the base and head branches. GitHub remote is already up to date.")
+                        return True
             print(f"GitHub API Error: {err_json.get('message', error_body)}", file=sys.stderr)
+            if "errors" in err_json:
+                print(f"Details: {json.dumps(err_json['errors'], indent=2)}", file=sys.stderr)
         except Exception:
             print(f"GitHub API Error {e.code}: {error_body}", file=sys.stderr)
         return False
