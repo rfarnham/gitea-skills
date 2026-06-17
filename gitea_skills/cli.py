@@ -42,6 +42,12 @@ def main():
     pr_diff.add_argument("pr_index", type=int)
     pr_details = pr_sub.add_parser("details")
     pr_details.add_argument("pr_index", type=int)
+    pr_comments = pr_sub.add_parser("comments", help="Retrieve general comments on a pull request")
+    pr_comments.add_argument("pr_index", type=int)
+    pr_comments.add_argument("--json", action="store_true", help="Output raw JSON")
+    pr_reviews = pr_sub.add_parser("reviews", help="Retrieve reviews and inline comments on a pull request")
+    pr_reviews.add_argument("pr_index", type=int)
+    pr_reviews.add_argument("--json", action="store_true", help="Output raw JSON")
 
     # review
     rev = subparsers.add_parser("review", help="Submit PR reviews")
@@ -91,6 +97,10 @@ def main():
             print(core.pr_get_diff(args.pr_index))
         elif args.action == "details":
             print(core.pr_get_details(args.pr_index))
+        elif args.action == "comments":
+            print(core.pr_get_comments(args.pr_index, args.json))
+        elif args.action == "reviews":
+            print(core.pr_get_reviews(args.pr_index, args.json))
 
     elif args.command == "review":
         if args.action == "submit":

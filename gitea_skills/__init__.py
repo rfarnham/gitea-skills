@@ -18,6 +18,8 @@ from gitea_skills.core import (
     pr_create,
     pr_get_diff,
     pr_get_details,
+    pr_get_comments,
+    pr_get_reviews,
     ci_get_status,
     submit_review,
     merge_pr,
