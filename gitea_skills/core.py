@@ -6,14 +6,21 @@ from pathlib import Path
 from gitea_skills import gitea_api
 
 def _get_project_dir() -> Path:
-    """Resolve the active project directory.
-    
-    Priority: GITEA_SKILLS_PROJECT_DIR env var > cwd.
+    """Get the root project directory.
+    Priority: GITEA_SKILLS_PROJECT_DIR env var > nearest parent with .agentic_dev > cwd.
     """
     env_dir = os.environ.get("GITEA_SKILLS_PROJECT_DIR")
     if env_dir:
         return Path(env_dir).resolve()
-    return Path.cwd().resolve()
+        
+    # Traverse upwards looking for .agentic_dev
+    current = Path.cwd().resolve()
+    for parent in [current] + list(current.parents):
+        if (parent / ".agentic_dev" / "tokens.env").exists():
+            return parent
+            
+    # Fallback to cwd if not found (e.g. for install/init commands)
+    return current
 
 def _get_agentic_dir() -> Path:
     return _get_project_dir() / ".agentic_dev"
