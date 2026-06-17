@@ -216,3 +216,131 @@ def merge_pr(pr_index: int, style: str = "merge") -> str:
         data=payload
     )
     return f"Successfully merged PR #{pr_index} using style '{style}'."
+
+
+def pr_get_comments(pr_index: int, as_json: bool = False) -> str:
+    """Retrieves general comments on a pull request.
+
+    Args:
+        pr_index: The index number of the pull request on Gitea.
+        as_json: Output raw JSON if True.
+    """
+    env = _load_env()
+    token = env.get("REVIEWER_AGENT_TOKEN", "") or env.get("DEVELOPER_AGENT_TOKEN", "") or env.get("ADMIN_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+    
+    comments = gitea_api.get_pr_comments(token, owner, repo, pr_index)
+    if as_json:
+        import json
+        return json.dumps(comments, indent=2)
+        
+    if not comments:
+        return "No comments found."
+        
+    def format_timestamp(ts_str):
+        if not ts_str:
+            return ""
+        ts_str = ts_str.replace("T", " ")
+        for char in [".", "Z", "+"]:
+            ts_str = ts_str.split(char)[0]
+        return ts_str.strip()
+
+    lines = []
+    for c in comments:
+        username = c.get("user", {}).get("username") or c.get("user", {}).get("login") or "unknown"
+        created_at = format_timestamp(c.get("created_at", ""))
+        body = c.get("body", "")
+        lines.append(f"[{username}] {created_at}:")
+        lines.append(body)
+        lines.append("-" * 50)
+    return "\n".join(lines)
+
+
+def pr_get_reviews(pr_index: int, as_json: bool = False) -> str:
+    """Retrieves reviews and inline comments on a pull request.
+
+    Args:
+        pr_index: The index number of the pull request on Gitea.
+        as_json: Output raw JSON if True.
+    """
+    env = _load_env()
+    token = env.get("REVIEWER_AGENT_TOKEN", "") or env.get("DEVELOPER_AGENT_TOKEN", "") or env.get("ADMIN_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+    
+    reviews = gitea_api.get_pr_reviews(token, owner, repo, pr_index)
+    if as_json:
+        extended_reviews = []
+        for r in reviews:
+            r_copy = dict(r)
+            r_id = r.get("id")
+            if r_id:
+                try:
+                    r_comments = gitea_api.get_review_comments(token, owner, repo, pr_index, r_id) or []
+                    r_copy["comments"] = r_comments
+                except Exception:
+                    r_copy["comments"] = []
+            else:
+                r_copy["comments"] = []
+            extended_reviews.append(r_copy)
+        import json
+        return json.dumps(extended_reviews, indent=2)
+
+    if not reviews:
+        return "No reviews found."
+
+    from collections import defaultdict
+    lines = []
+    for r in reviews:
+        review_id = r.get("id")
+        author = r.get("user", {}).get("username") or r.get("user", {}).get("login") or "unknown"
+        state = r.get("state", "COMMENT")
+        body = r.get("body", "")
+        
+        lines.append("=" * 80)
+        lines.append(f"Review ID {review_id} by [{author}] ({state})")
+        lines.append("=" * 80)
+        
+        if body.strip():
+            lines.append(body.strip())
+            lines.append("")
+            
+        if review_id:
+            try:
+                inline_comments = gitea_api.get_review_comments(token, owner, repo, pr_index, review_id) or []
+            except Exception:
+                inline_comments = []
+            
+            if inline_comments:
+                comments_by_location = defaultdict(list)
+                for comment in inline_comments:
+                    path = comment.get("path", "")
+                    position = comment.get("position") or 0
+                    comments_by_location[(path, position)].append(comment)
+                
+                sorted_locations = sorted(comments_by_location.keys(), key=lambda x: (x[0], x[1] or 0))
+                
+                for path, position in sorted_locations:
+                    loc_comments = comments_by_location[(path, position)]
+                    first_comment = loc_comments[0]
+                    original_position = first_comment.get("original_position")
+                    diff_hunk = first_comment.get("diff_hunk", "")
+                    
+                    lines.append(f"File: {path}")
+                    line_str = f"Line: {position}" if position else "Line: ?"
+                    if original_position:
+                        line_str += f" (Original Line: {original_position})"
+                    lines.append(line_str)
+                    
+                    if diff_hunk.strip():
+                        lines.append("Diff:")
+                        lines.append(diff_hunk.strip())
+                        
+                    for comment in loc_comments:
+                        c_body = comment.get("body", "")
+                        lines.append(f"Comment: {c_body}")
+                    lines.append("-" * 80)
+    return "\n".join(lines)

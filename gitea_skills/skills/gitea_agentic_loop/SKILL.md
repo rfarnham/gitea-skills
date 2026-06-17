@@ -58,6 +58,16 @@ View PR details:
 gitea-skills pr details <pr_index>
 ```
 
+View PR comments:
+```bash
+gitea-skills pr comments <pr_index> [--json]
+```
+
+View PR reviews:
+```bash
+gitea-skills pr reviews <pr_index> [--json]
+```
+
 ### Code Review
 
 Submit a review on a PR:
