@@ -4,21 +4,15 @@
 import sys
 import subprocess
 import platform
+from pathlib import Path
 
-SERVICE = "friendly-davinci-github"
-ACCOUNT = "token"
+# Add parent directory to sys.path to allow importing from gitea_skills when run directly as a script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from gitea_skills.github_auth import check_keychain
 
 def get_token():
-    if platform.system() != "Darwin":
-        return None
-    try:
-        res = subprocess.run(
-            ["security", "find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"],
-            capture_output=True, text=True, check=True
-        )
-        return res.stdout.strip()
-    except subprocess.CalledProcessError:
-        return None
+    return check_keychain()
 
 def main():
     # Git calls the helper with 'get', 'store', or 'erase'
