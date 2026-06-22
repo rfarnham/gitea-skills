@@ -66,6 +66,17 @@ fi
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")"
 SYNC_BRANCH="sync/gitea-$CURRENT_BRANCH"
 
+# Check if the base branch exists on the remote repository
+REMOTE_HEADS="$( "${PUSH_CMD[@]}" ls-remote --heads github 2>/dev/null || true )"
+
+if [ -z "$REMOTE_HEADS" ] || ! echo "$REMOTE_HEADS" | grep -q "refs/heads/$CURRENT_BRANCH"; then
+    echo "Remote repository is empty or missing the '$CURRENT_BRANCH' branch."
+    echo "Performing a direct push to initialize '$CURRENT_BRANCH' on GitHub..."
+    "${PUSH_CMD[@]}" push -u github "$CURRENT_BRANCH"
+    echo "Done! Initial branch '$CURRENT_BRANCH' created on GitHub. Skipping Pull Request creation."
+    exit 0
+fi
+
 echo "Pushing local $CURRENT_BRANCH branch to GitHub remote as $SYNC_BRANCH..."
 "${PUSH_CMD[@]}" push -f github "$CURRENT_BRANCH:refs/heads/$SYNC_BRANCH"
 
