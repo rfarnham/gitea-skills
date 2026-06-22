@@ -5,6 +5,7 @@ import subprocess
 import getpass
 import sys
 import platform
+import os
 from pathlib import Path
 
 # Add parent directory to sys.path to allow importing from gitea_skills when run directly as a script
@@ -13,6 +14,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gitea_skills.core import _load_env
 
 ACCOUNT = "token"
+
+def get_github_token() -> str:
+    """Retrieve GitHub token using the priority sequence:
+    1. GITHUB_TOKEN or GITHUB_PAT environment variables.
+    2. GITHUB_TOKEN or GITHUB_PAT in local project / global config.
+    3. macOS Keychain fallback.
+    """
+    # 1. Environment variables
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+    if token:
+        return token.strip()
+        
+    # 2. Local config / global config
+    try:
+        env = _load_env()
+        token = env.get("GITHUB_TOKEN") or env.get("GITHUB_PAT")
+        if token:
+            return token.strip()
+    except Exception:
+        pass
+        
+    # 3. macOS Keychain fallback
+    return check_keychain()
 
 def get_service_name() -> str:
     """Get the project-scoped Keychain service name."""
@@ -68,9 +92,9 @@ def save_keychain(token):
         return False
 
 def main():
-    token = check_keychain()
+    token = get_github_token()
     if token:
-        print("Credentials loaded successfully from macOS Keychain.", file=sys.stderr)
+        print("Credentials loaded successfully.", file=sys.stderr)
         sys.exit(0)
         
     print("No GitHub credentials found in macOS Keychain.", file=sys.stderr)
