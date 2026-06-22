@@ -76,6 +76,17 @@ def main():
     inst = subparsers.add_parser("install", help="Set up a project for the gitea dev loop")
     inst.add_argument("--target-dir", default=".")
 
+    # repo
+    repo = subparsers.add_parser("repo", help="Manage Gitea repositories")
+    repo_sub = repo.add_subparsers(dest="action", required=True)
+    repo_create = repo_sub.add_parser("create", help="Create a Gitea repository")
+    repo_create.add_argument("name", help="Name of the repository")
+    repo_create.add_argument("--description", default="", help="Description of the repository")
+    repo_create.add_argument("--private", action="store_true", help="Create a private repository")
+    repo_create.add_argument("--auto-init", action="store_true", help="Auto initialize repository")
+    repo_create.add_argument("--owner", help="Gitea user or organization owner")
+    repo_create.add_argument("--set-origin", action="store_true", help="Set local remote origin to the new repo clone URL")
+
     args = parser.parse_args()
 
     # Set project dir env var if provided
@@ -125,6 +136,17 @@ def main():
     elif args.command == "install":
         from gitea_skills.install import run_install
         run_install(args.target_dir)
+
+    elif args.command == "repo":
+        if args.action == "create":
+            print(core.repo_create(
+                name=args.name,
+                description=args.description,
+                private=args.private,
+                auto_init=args.auto_init,
+                owner=args.owner,
+                set_origin=args.set_origin
+            ))
 
 
 if __name__ == "__main__":
