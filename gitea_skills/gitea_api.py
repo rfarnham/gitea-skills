@@ -68,18 +68,40 @@ def create_token(username, password, token_name):
     )
 
 
+def get_user(token):
+    """Get the authenticated user's details."""
+    return _request("GET", "/user", token)
+
+
 # ---------------------------------------------------------------------------
 # Repositories
 # ---------------------------------------------------------------------------
 
-def create_repo(token, name, description="", auto_init=False):
-    """Create a repository owned by the authenticated user."""
-    return _request("POST", "/user/repos", token, {
+def create_repo(token, name, description="", auto_init=False, private=False, owner=None):
+    """Create a Gitea repository.
+    
+    If owner is specified and differs from the authenticated user, 
+    creates the repository under the specified organization.
+    """
+    data = {
         "name": name,
         "description": description,
+        "private": private,
         "auto_init": auto_init,
         "default_branch": "main",
-    })
+    }
+    
+    if owner:
+        try:
+            user_info = get_user(token)
+            current_user = user_info.get("username")
+        except Exception:
+            current_user = None
+            
+        if current_user and current_user.lower() != owner.lower():
+            return _request("POST", f"/orgs/{owner}/repos", token, data)
+            
+    return _request("POST", "/user/repos", token, data)
 
 
 def add_collaborator(token, owner, repo, username, permission="write"):
