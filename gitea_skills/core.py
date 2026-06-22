@@ -351,3 +351,49 @@ def pr_get_reviews(pr_index: int, as_json: bool = False) -> str:
                         lines.append(f"Comment: {c_body}")
                     lines.append("-" * 80)
     return "\n".join(lines)
+
+
+def repo_create(name: str, description: str = "", private: bool = False, auto_init: bool = False, owner: str = None, set_origin: bool = False) -> str:
+    """Creates a new Gitea repository.
+
+    Args:
+        name: The name of the Gitea repository to create.
+        description: A brief description of the repository.
+        private: If True, creates a private repository. (Default: False)
+        auto_init: Initialize the repository with an initial commit containing a default README.md and .gitignore.
+        owner: Creates the repository under a specific organization or user name instead of the default authenticated user.
+        set_origin: If run inside a local Git directory, automatically run `git remote add origin` (or `set-url` if it exists) using the newly created repository clone URL.
+    """
+    env = _load_env()
+    token = env.get("ADMIN_TOKEN") or env.get("DEVELOPER_AGENT_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+    
+    res = gitea_api.create_repo(
+        token=token,
+        name=name,
+        description=description,
+        auto_init=auto_init,
+        private=private,
+        owner=owner
+    )
+    
+    clone_url = res.get("clone_url")
+    msg = f"Repository '{name}' created successfully! Clone URL: {clone_url}"
+    
+    if set_origin:
+        # Check if inside git repository
+        current_dir = Path.cwd().resolve()
+        git_check = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(current_dir), capture_output=True, text=True)
+        if git_check.returncode == 0 and git_check.stdout.strip() == "true":
+            # Check if origin remote already exists
+            origin_check = subprocess.run(["git", "remote", "get-url", "origin"], cwd=str(current_dir), capture_output=True, text=True)
+            if origin_check.returncode == 0:
+                subprocess.run(["git", "remote", "set-url", "origin", clone_url], cwd=str(current_dir), check=True)
+                msg += "\nUpdated existing git remote 'origin' to the new repository clone URL."
+            else:
+                subprocess.run(["git", "remote", "add", "origin", clone_url], cwd=str(current_dir), check=True)
+                msg += "\nAdded new git remote 'origin' pointing to the repository clone URL."
+        else:
+            msg += "\nWarning: --set-origin was specified but not running inside a git repository."
+            
+    return msg

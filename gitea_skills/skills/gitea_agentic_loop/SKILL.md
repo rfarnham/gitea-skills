@@ -29,6 +29,13 @@ All commands use the `gitea-skills` CLI tool which must be installed (`pip insta
 
 ## Available Commands
 
+### Repository Management
+
+Create a new repository on Gitea:
+```bash
+gitea-skills repo create <name> [--description "desc"] [--private] [--auto-init] [--owner <owner>] [--set-origin]
+```
+
 ### Worktree Management
 
 Create an isolated workspace for a feature branch:
