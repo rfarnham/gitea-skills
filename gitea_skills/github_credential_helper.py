@@ -9,10 +9,10 @@ from pathlib import Path
 # Add parent directory to sys.path to allow importing from gitea_skills when run directly as a script
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gitea_skills.github_auth import check_keychain
+from gitea_skills.github_auth import get_github_token
 
 def get_token():
-    return check_keychain()
+    return get_github_token()
 
 def main():
     # Git calls the helper with 'get', 'store', or 'erase'

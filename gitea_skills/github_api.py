@@ -116,6 +116,15 @@ def create_pull_request(owner: str, repo: str, token: str, head: str, base: str,
             return True
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
+        if e.code == 403 and "Resource not accessible by personal access token" in error_body:
+            print("ERROR: GitHub API Access Forbidden (403).", file=sys.stderr)
+            print("This error usually occurs when using a GitHub Fine-grained Personal Access Token", file=sys.stderr)
+            print("that lacks the necessary permissions to create Pull Requests.", file=sys.stderr)
+            print("Troubleshooting:", file=sys.stderr)
+            print("  Go to your GitHub Token settings and ensure the token has:", file=sys.stderr)
+            print("  - Repository permissions -> 'Pull requests': Read and write", file=sys.stderr)
+            return False
+            
         try:
             err_json = json.loads(error_body)
             # Check if it's a duplicate PR error
@@ -324,10 +333,10 @@ def main():
         print(f"Error: Could not parse owner/repo from remote URL: {remote_url}", file=sys.stderr)
         sys.exit(1)
 
-    # Securely retrieve the token from macOS Keychain
-    token = github_auth.check_keychain()
+    # Retrieve the token (env var, config files, or macOS Keychain)
+    token = github_auth.get_github_token(verbose=False)
     if not token:
-        print("Error: No GitHub token found in macOS Keychain. Please run ./scripts/github_auth.py first.", file=sys.stderr)
+        print("Error: No GitHub token found. Please set GITHUB_TOKEN/GITHUB_PAT or run global setup.", file=sys.stderr)
         sys.exit(1)
 
     title = args.title or f"sync: merge {args.head} into {args.base}"

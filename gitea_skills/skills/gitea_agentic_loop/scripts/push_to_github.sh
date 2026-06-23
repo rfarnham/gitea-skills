@@ -17,12 +17,42 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     exit 1
 fi
 
+# ── Parse arguments ──────────────────────────────────────────────────────
+TOKEN_OVERRIDE=""
+GITHUB_URL_ARG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --token)
+            if [ -n "${2:-}" ]; then
+                TOKEN_OVERRIDE="$2"
+                shift 2
+            else
+                echo "ERROR: --token requires a value" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            if [ -z "$GITHUB_URL_ARG" ]; then
+                GITHUB_URL_ARG="$1"
+                shift
+            else
+                echo "ERROR: Unknown argument: $1" >&2
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [ -n "$TOKEN_OVERRIDE" ]; then
+    export GITHUB_TOKEN="$TOKEN_OVERRIDE"
+fi
+
 # ── Ensure 'github' remote exists ────────────────────────────────────────
 if ! git remote get-url github &>/dev/null; then
-    if [ $# -ge 1 ]; then
-        GITHUB_URL="$1"
-        echo "Adding 'github' remote → $GITHUB_URL"
-        git remote add github "$GITHUB_URL"
+    if [ -n "$GITHUB_URL_ARG" ]; then
+        echo "Adding 'github' remote → $GITHUB_URL_ARG"
+        git remote add github "$GITHUB_URL_ARG"
     else
         echo "ERROR: No 'github' remote configured."
         echo ""
@@ -65,6 +95,17 @@ fi
 # ── Push to Sync Branch & Create Pull Request ────────────────────────────
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")"
 SYNC_BRANCH="sync/gitea-$CURRENT_BRANCH"
+
+# Check if the base branch exists on the remote repository
+REMOTE_HEADS="$( "${PUSH_CMD[@]}" ls-remote --heads github 2>/dev/null || true )"
+
+if [ -z "$REMOTE_HEADS" ] || ! echo "$REMOTE_HEADS" | grep -q "refs/heads/$CURRENT_BRANCH"; then
+    echo "Remote repository is empty or missing the '$CURRENT_BRANCH' branch."
+    echo "Performing a direct push to initialize '$CURRENT_BRANCH' on GitHub..."
+    "${PUSH_CMD[@]}" push -u github "$CURRENT_BRANCH"
+    echo "Done! Initial branch '$CURRENT_BRANCH' created on GitHub. Skipping Pull Request creation."
+    exit 0
+fi
 
 echo "Pushing local $CURRENT_BRANCH branch to GitHub remote as $SYNC_BRANCH..."
 "${PUSH_CMD[@]}" push -f github "$CURRENT_BRANCH:refs/heads/$SYNC_BRANCH"
