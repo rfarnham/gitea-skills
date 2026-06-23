@@ -1,0 +1,51 @@
+name: Agent Issue Fixer
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  resolve-issue:
+    # Run if the issue is labeled 'agent-fix', or if it was opened with the 'agent-fix' label
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'agent-fix') ||
+      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent-fix'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Gitea Actions Agent"
+          git config --global user.email "agent@gitea.local"
+
+      - name: Set up agentic configuration
+        run: |
+          mkdir -p .agentic_dev
+          cat <<EOF > .agentic_dev/tokens.env
+          GITEA_URL=http://localhost:3000
+          REPO_OWNER=${{ github.repository_owner }}
+          REPO_NAME=${{ github.event.repository.name }}
+          DEVELOPER_AGENT_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          ADMIN_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          EOF
+          cat <<EOF > .agentic_dev/config.env
+          TEST_COMMAND=pytest
+          EOF
+
+      - name: Run Developer Agent
+        run: ./scripts/run_developer.py --issue ${{ github.event.issue.number }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
