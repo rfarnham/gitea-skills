@@ -65,3 +65,24 @@ Once installed, the skill is automatically available. Just tell the agent:
 > "Use the gitea-agentic-loop skill to create a feature branch and implement..."
 
 The agent will see the skill in its available skills list and follow the instructions in SKILL.md.
+
+---
+
+## Troubleshooting
+
+### 1. GitHub API Access Forbidden (403)
+If the CLI reports `Resource not accessible by personal access token` when attempting to create a Pull Request on GitHub, it means your GitHub Fine-grained Personal Access Token (PAT) lacks the required permissions.
+- **Fix**: Go to your GitHub Developer Settings, edit the token, and ensure it has **Repository permissions -> "Pull requests": Read and write** enabled.
+
+### 2. macOS Keychain Caching & Permission Denied (403) on Push
+On macOS, Git's global credential helper (`osxkeychain`) might cache a GitHub token/password that doesn't have write access to your new repository. Git will prioritize the cached global token and fail with `403 Permission Denied` before Gitea-skills' helper can run.
+- **Fix**: Run `gitea-skills install` to set up the repository. This automatically runs `git config --local credential.helper ""` to ignore global helpers for the repository.
+- **Manual Fix**: You can manually clear the global helper inheritance by running:
+  ```bash
+  git config --local credential.helper ""
+  ```
+  To completely clear a cached credential for GitHub from your macOS Keychain, run:
+  ```bash
+  echo -e "host=github.com\nprotocol=https" | git credential-osxkeychain erase
+  ```
+
