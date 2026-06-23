@@ -84,17 +84,25 @@ def test_credential_helper_gets_token():
         assert get_token() == "helper-token"
         mock_check.assert_called_once()
 
-def test_get_github_token_env_var():
+@patch("urllib.request.urlopen")
+def test_get_github_token_env_var(mock_urlopen):
+    # Mock successful response
+    mock_urlopen.return_value.__enter__.return_value.read.return_value = b'{"login": "testuser"}'
+    
     # Priority 1: GITHUB_TOKEN env var
     with patch.dict(os.environ, {"GITHUB_TOKEN": "env-token", "GITHUB_PAT": "ignored-pat"}):
-        assert get_github_token() == "env-token"
+        assert get_github_token(verbose=False) == "env-token"
         
     with patch.dict(os.environ, {"GITHUB_PAT": "pat-token"}):
         if "GITHUB_TOKEN" in os.environ:
             del os.environ["GITHUB_TOKEN"]
-        assert get_github_token() == "pat-token"
+        assert get_github_token(verbose=False) == "pat-token"
 
-def test_get_github_token_config_file():
+@patch("urllib.request.urlopen")
+def test_get_github_token_config_file(mock_urlopen):
+    # Mock successful response
+    mock_urlopen.return_value.__enter__.return_value.read.return_value = b'{"login": "testuser"}'
+    
     # Priority 2: local/global config
     mock_env = {"GITHUB_TOKEN": "config-token"}
     with patch.dict(os.environ, {}), patch("gitea_skills.github_auth._load_env", return_value=mock_env):
@@ -102,18 +110,45 @@ def test_get_github_token_config_file():
             del os.environ["GITHUB_TOKEN"]
         if "GITHUB_PAT" in os.environ:
             del os.environ["GITHUB_PAT"]
-        assert get_github_token() == "config-token"
+        assert get_github_token(verbose=False) == "config-token"
 
+@patch("urllib.request.urlopen")
 @patch("gitea_skills.github_auth.check_keychain", return_value="keychain-token")
-def test_get_github_token_keychain_fallback(mock_check_keychain):
+def test_get_github_token_keychain_fallback(mock_check_keychain, mock_urlopen):
+    # Mock successful response
+    mock_urlopen.return_value.__enter__.return_value.read.return_value = b'{"login": "testuser"}'
+    
     # Priority 3: macOS Keychain fallback
     with patch.dict(os.environ, {}), patch("gitea_skills.github_auth._load_env", return_value={}):
         if "GITHUB_TOKEN" in os.environ:
             del os.environ["GITHUB_TOKEN"]
         if "GITHUB_PAT" in os.environ:
             del os.environ["GITHUB_PAT"]
-        assert get_github_token() == "keychain-token"
+        assert get_github_token(verbose=False) == "keychain-token"
         mock_check_keychain.assert_called_once()
+
+@patch("urllib.request.urlopen")
+@patch("gitea_skills.github_auth.check_keychain", return_value="keychain-token")
+def test_get_github_token_validation_fallback(mock_check_keychain, mock_urlopen):
+    import urllib.error
+    # Mock urlopen: first call (env var) raises 401 HTTPError, second call (keychain) succeeds
+    fp = MagicMock()
+    fp.read.return_value = b'{"message": "Unauthorized"}'
+    error = urllib.error.HTTPError("url", 401, "Unauthorized", {}, fp)
+    
+    success_resp = MagicMock()
+    success_resp.read.return_value = b'{"login": "testuser"}'
+    
+    mock_urlopen.side_effect = [error, success_resp.__enter__.return_value]
+    
+    # Set env var
+    with patch.dict(os.environ, {"GITHUB_TOKEN": "invalid-env-token"}):
+        if "GITHUB_PAT" in os.environ:
+            del os.environ["GITHUB_PAT"]
+        token = get_github_token(verbose=True)
+        # Should fall back to Keychain
+        assert token == "keychain-token"
+        assert mock_urlopen.call_count == 2
 
 @patch("urllib.request.urlopen")
 @patch("gitea_skills.github_api.check_existing_pull_request", return_value=None)

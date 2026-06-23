@@ -78,6 +78,33 @@ def run_install(target_dir: str = "."):
         symlink_path.symlink_to(package_dir)
         print(f"  Symlink: {symlink_path} -> {package_dir}")
     
+    # 4. Clear local Git credential helper to avoid conflicts with global osxkeychain
+    try:
+        import subprocess
+        is_git = False
+        if (target / ".git").exists():
+            is_git = True
+        else:
+            res = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                cwd=str(target),
+                capture_output=True,
+                text=True
+            )
+            if res.returncode == 0:
+                is_git = True
+                
+        if is_git:
+            subprocess.run(
+                ["git", "config", "--local", "credential.helper", ""],
+                cwd=str(target),
+                check=True,
+                capture_output=True
+            )
+            print("  Cleared local Git credential helper config to avoid global Keychain conflicts.")
+    except Exception as e:
+        print(f"  Warning: Could not clear local Git credential helper: {e}")
+    
     print("")
     print("Setup complete! Next steps:")
     print(f"  1. Edit {tokens_path} with your Gitea tokens (if not already done)")
