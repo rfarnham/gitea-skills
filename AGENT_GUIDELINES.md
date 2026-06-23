@@ -226,3 +226,24 @@ Include:
 - PRs always target `main`.
 - Never force-push.
 - All tests must pass before requesting review.
+- **Strict No-Silent-Merges Policy**: Agents must never self-merge PRs. After opening a PR, the agent must wait for a human or reviewer-agent to submit an `APPROVED` review status, then the human (or explicitly instructed sync pipeline) will merge.
+
+---
+
+## §6 — Issue Tracking Workflow
+
+The Gitea Issue Tracker is the primary source of truth for repository tasks, bugs, and feature requests.
+
+### 1. Creating Issues
+If an agent (e.g. during a subagent run or when encountering an unhandled failure) identifies a bug, missing test, or feature gap, it must open a Gitea issue:
+```bash
+gitea-skills issue create --title "bug: describe issue" --body "Steps to reproduce:\n1. ...\n\nExpected behavior:\n..." --labels "bug"
+```
+
+### 2. Working on Issues
+To implement a fix or feature for an issue:
+1. Identify the open issue using `gitea-skills issue list`.
+2. Check out a branch named `agent/issue-<index>` (e.g., `agent/issue-5`).
+3. Address the problem described in the issue.
+4. Open a Pull Request referencing the issue index in the body (e.g. `Fixes #5`). This links the PR to the issue in Gitea.
+
