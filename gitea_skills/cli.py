@@ -71,6 +71,7 @@ def main():
     # push-to-github
     ptg = subparsers.add_parser("push-to-github", help="Push to GitHub and create PR")
     ptg.add_argument("github_url", nargs="?", default=None)
+    ptg.add_argument("--token", help="GitHub Personal Access Token (PAT) override")
 
     # install
     inst = subparsers.add_parser("install", help="Set up a project for the gitea dev loop")
@@ -129,6 +130,8 @@ def main():
         from pathlib import Path
         script = Path(__file__).parent / "skills" / "gitea_agentic_loop" / "scripts" / "push_to_github.sh"
         cmd = ["bash", str(script)]
+        if args.token:
+            cmd.extend(["--token", args.token])
         if args.github_url:
             cmd.append(args.github_url)
         subprocess.run(cmd, check=True)

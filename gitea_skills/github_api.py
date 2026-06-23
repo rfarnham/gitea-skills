@@ -334,7 +334,7 @@ def main():
         sys.exit(1)
 
     # Retrieve the token (env var, config files, or macOS Keychain)
-    token = github_auth.get_github_token()
+    token = github_auth.get_github_token(verbose=False)
     if not token:
         print("Error: No GitHub token found. Please set GITHUB_TOKEN/GITHUB_PAT or run global setup.", file=sys.stderr)
         sys.exit(1)
