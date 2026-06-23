@@ -38,7 +38,7 @@ def slugify(text, max_len=40):
     return slug[:max_len]
 
 
-async def run_developer(task, branch, revise_pr=None):
+async def run_developer(task, branch, revise_pr=None, issue_index=None):
     # Import here so the script gives a clear error if not installed
     try:
         from google.antigravity import Agent, LocalAgentConfig
@@ -86,8 +86,10 @@ async def run_developer(task, branch, revise_pr=None):
             f"1. Run tests using: {test_cmd}. Ensure they pass.\n"
             f"2. Commit the changes with a conventional commit message.\n"
             f"3. Push your branch and open a PR targeting 'main' using the 'pr_create' tool.\n"
-            f"4. Poll the Gitea CI build status using the 'ci_get_status' tool. If it passes, stop and inform the user you are waiting for human review."
         )
+        if issue_index:
+            prompt += f"   - Since this resolves Gitea Issue #{issue_index}, you MUST include the text 'Fixes #{issue_index}' in the PR body parameter of 'pr_create' to automatically link the PR to the issue.\n"
+        prompt += f"4. Poll the Gitea CI build status using the 'ci_get_status' tool. If it passes, stop and inform the user you are waiting for human review."
 
     system_instructions = f"""\
 You are a Developer Agent working in this repository: {worktree_dir}
@@ -133,21 +135,47 @@ def main():
     parser.add_argument("--branch", help="Branch name (auto-generated if omitted)")
     parser.add_argument("--pr", type=int, help="PR number to revise (used with --revise)")
     parser.add_argument("--revise", action="store_true", help="Revise an existing PR")
+    parser.add_argument("--issue", type=int, help="Gitea Issue number to resolve")
     args = parser.parse_args()
 
     if args.revise and not args.pr:
         parser.error("--revise requires --pr <number>")
-    if not args.revise and not args.task:
-        parser.error("--task is required for new work (or use --revise --pr N)")
+
+    work_options = sum(1 for opt in [args.task, args.revise, args.issue] if opt)
+    if work_options == 0:
+        parser.error("At least one of --task, --issue, or --revise is required.")
+    if work_options > 1:
+        parser.error("Only one of --task, --issue, or --revise can be specified.")
+
+    task = args.task
+    if args.issue:
+        tokens = load_env(AGENTIC_DIR / "tokens.env")
+        gitea_url = tokens.get("GITEA_URL", "http://localhost:3000")
+        repo_owner = tokens.get("REPO_OWNER", "admin")
+        repo_name = tokens.get("REPO_NAME", "friendly-davinci")
+        token = tokens.get("DEVELOPER_AGENT_TOKEN") or tokens.get("ADMIN_TOKEN") or tokens.get("REVIEWER_AGENT_TOKEN", "")
+        
+        from gitea_skills import gitea_api
+        gitea_api.GITEA_URL = gitea_url
+        try:
+            issue = gitea_api.get_issue(token, repo_owner, repo_name, args.issue)
+            issue_title = issue.get("title")
+            issue_body = issue.get("body") or "No description provided."
+            task = f"Fix Gitea Issue #{args.issue}: {issue_title}\n\nDescription:\n{issue_body}"
+        except Exception as e:
+            print(f"ERROR: Could not fetch issue #{args.issue} from Gitea: {e}", file=sys.stderr)
+            sys.exit(1)
 
     if args.branch:
         branch = args.branch
-    elif args.task:
-        branch = f"agent/{slugify(args.task)}"
+    elif args.issue:
+        branch = f"agent/issue-{args.issue}"
+    elif task:
+        branch = f"agent/{slugify(task)}"
     else:
         branch = f"agent/revise-pr-{args.pr}"
 
-    asyncio.run(run_developer(args.task, branch, revise_pr=args.pr if args.revise else None))
+    asyncio.run(run_developer(task, branch, revise_pr=args.pr if args.revise else None, issue_index=args.issue))
 
 
 if __name__ == "__main__":

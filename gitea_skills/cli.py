@@ -88,6 +88,25 @@ def main():
     repo_create.add_argument("--owner", help="Gitea user or organization owner")
     repo_create.add_argument("--set-origin", action="store_true", help="Set local remote origin to the new repo clone URL")
 
+    # issue
+    issue = subparsers.add_parser("issue", help="Manage Gitea issues")
+    issue_sub = issue.add_subparsers(dest="action", required=True)
+    issue_create = issue_sub.add_parser("create", help="Create an issue")
+    issue_create.add_argument("--title", required=True, help="Title of the issue")
+    issue_create.add_argument("--body", required=True, help="Description of the issue")
+    issue_create.add_argument("--labels", nargs="*", help="Optional list of labels")
+    
+    issue_list = issue_sub.add_parser("list", help="List issues")
+    issue_list.add_argument("--state", default="open", choices=["open", "closed", "all"], help="Issue state")
+    
+    issue_details = issue_sub.add_parser("details", help="Show issue details")
+    issue_details.add_argument("index", type=int, help="Issue index")
+    
+    issue_close = issue_sub.add_parser("close", help="Close an issue")
+    issue_close.add_argument("index", type=int, help="Issue index")
+
+    issue_dedup = issue_sub.add_parser("dedup", help="Identify and merge duplicate issues")
+
     args = parser.parse_args()
 
     # Set project dir env var if provided
@@ -150,6 +169,18 @@ def main():
                 owner=args.owner,
                 set_origin=args.set_origin
             ))
+
+    elif args.command == "issue":
+        if args.action == "create":
+            print(core.issue_create(args.title, args.body, args.labels))
+        elif args.action == "list":
+            print(core.issue_list(args.state))
+        elif args.action == "details":
+            print(core.issue_details(args.index))
+        elif args.action == "close":
+            print(core.issue_close(args.index))
+        elif args.action == "dedup":
+            print(core.issue_dedup())
 
 
 if __name__ == "__main__":

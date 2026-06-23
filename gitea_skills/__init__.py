@@ -24,4 +24,9 @@ from gitea_skills.core import (
     submit_review,
     merge_pr,
     repo_create,
+    issue_create,
+    issue_list,
+    issue_details,
+    issue_close,
+    issue_dedup,
 )
