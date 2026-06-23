@@ -67,13 +67,18 @@ def test_create_repo_org_owned(mock_request, mock_get_user):
     })
 
 @patch("gitea_skills.core._load_env", return_value={"ADMIN_TOKEN": "token", "GITEA_URL": "http://localhost:3000"})
+@patch("gitea_skills.gitea_api.add_collaborator")
 @patch("gitea_skills.gitea_api.create_repo")
-def test_repo_create_core_no_origin(mock_create_repo, mock_load_env):
-    mock_create_repo.return_value = {"clone_url": "http://localhost:3000/admin/test.git"}
+def test_repo_create_core_no_origin(mock_create_repo, mock_add_collaborator, mock_load_env):
+    mock_create_repo.return_value = {
+        "clone_url": "http://localhost:3000/admin/test.git",
+        "owner": {"username": "admin"}
+    }
     
     msg = repo_create("test", "desc", private=False, auto_init=False)
     assert "Repository 'test' created successfully!" in msg
     assert "Clone URL: http://localhost:3000/admin/test.git" in msg
+    assert "Added 'developer-agent' and 'reviewer-agent' as collaborators" in msg
     mock_create_repo.assert_called_once_with(
         token="token",
         name="test",
@@ -82,12 +87,19 @@ def test_repo_create_core_no_origin(mock_create_repo, mock_load_env):
         private=False,
         owner=None
     )
+    assert mock_add_collaborator.call_count == 2
+    mock_add_collaborator.assert_any_call("token", "admin", "test", "developer-agent", "write")
+    mock_add_collaborator.assert_any_call("token", "admin", "test", "reviewer-agent", "write")
 
 @patch("gitea_skills.core._load_env", return_value={"ADMIN_TOKEN": "token", "GITEA_URL": "http://localhost:3000"})
+@patch("gitea_skills.gitea_api.add_collaborator")
 @patch("gitea_skills.gitea_api.create_repo")
 @patch("subprocess.run")
-def test_repo_create_core_set_origin_new(mock_run, mock_create_repo, mock_load_env):
-    mock_create_repo.return_value = {"clone_url": "http://localhost:3000/admin/test.git"}
+def test_repo_create_core_set_origin_new(mock_run, mock_create_repo, mock_add_collaborator, mock_load_env):
+    mock_create_repo.return_value = {
+        "clone_url": "http://localhost:3000/admin/test.git",
+        "owner": {"username": "admin"}
+    }
     
     # Mock git check: inside worktree=true, origin check fails (no origin remote exists)
     mock_run.side_effect = [
@@ -101,12 +113,17 @@ def test_repo_create_core_set_origin_new(mock_run, mock_create_repo, mock_load_e
     assert mock_run.call_count == 3
     # Check that remote add origin was called
     mock_run.assert_any_call(["git", "remote", "add", "origin", "http://localhost:3000/admin/test.git"], cwd=str(Path.cwd().resolve()), check=True)
+    assert mock_add_collaborator.call_count == 2
 
 @patch("gitea_skills.core._load_env", return_value={"ADMIN_TOKEN": "token", "GITEA_URL": "http://localhost:3000"})
+@patch("gitea_skills.gitea_api.add_collaborator")
 @patch("gitea_skills.gitea_api.create_repo")
 @patch("subprocess.run")
-def test_repo_create_core_set_origin_exists(mock_run, mock_create_repo, mock_load_env):
-    mock_create_repo.return_value = {"clone_url": "http://localhost:3000/admin/test.git"}
+def test_repo_create_core_set_origin_exists(mock_run, mock_create_repo, mock_add_collaborator, mock_load_env):
+    mock_create_repo.return_value = {
+        "clone_url": "http://localhost:3000/admin/test.git",
+        "owner": {"username": "admin"}
+    }
     
     # Mock git check: inside worktree=true, origin check succeeds (origin remote already exists)
     mock_run.side_effect = [
@@ -120,3 +137,4 @@ def test_repo_create_core_set_origin_exists(mock_run, mock_create_repo, mock_loa
     assert mock_run.call_count == 3
     # Check that remote set-url origin was called
     mock_run.assert_any_call(["git", "remote", "set-url", "origin", "http://localhost:3000/admin/test.git"], cwd=str(Path.cwd().resolve()), check=True)
+    assert mock_add_collaborator.call_count == 2
