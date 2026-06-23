@@ -408,3 +408,120 @@ def repo_create(name: str, description: str = "", private: bool = False, auto_in
             msg += "\nWarning: --set-origin was specified but not running inside a git repository."
             
     return msg
+
+
+def issue_create(title: str, body: str, labels: list = None) -> str:
+    """Creates a new issue on Gitea.
+
+    Args:
+        title: The title of the issue.
+        body: The detailed description of the issue.
+        labels: Optional list of labels to assign.
+    """
+    env = _load_env()
+    token = env.get("DEVELOPER_AGENT_TOKEN") or env.get("ADMIN_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+
+    # Map label names (strings) to Gitea Label IDs (int64)
+    label_ids = []
+    if labels:
+        try:
+            existing_labels = gitea_api.list_repo_labels(token, owner, repo) or []
+            label_map = {l["name"].lower(): l["id"] for l in existing_labels}
+            for name in labels:
+                name_lower = name.lower()
+                if name_lower in label_map:
+                    label_ids.append(label_map[name_lower])
+                else:
+                    # Try to create label if it doesn't exist
+                    try:
+                        new_label = gitea_api.create_repo_label(token, owner, repo, name)
+                        if new_label and "id" in new_label:
+                            label_ids.append(new_label["id"])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    res = gitea_api.create_issue(token, owner, repo, title, body, label_ids)
+    return f"Issue created successfully! Issue Index: {res.get('number')}"
+
+
+def issue_list(state: str = "open") -> str:
+    """Lists issues in the Gitea repository.
+
+    Args:
+        state: The state of the issues (open, closed, all).
+    """
+    env = _load_env()
+    token = env.get("DEVELOPER_AGENT_TOKEN") or env.get("ADMIN_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+
+    issues = gitea_api.list_issues(token, owner, repo, state=state, type="issues")
+    if not issues:
+        return f"No {state} issues found."
+
+    lines = []
+    for issue in issues:
+        idx = issue.get("number")
+        title = issue.get("title")
+        labels = ", ".join(l.get("name") for l in issue.get("labels", []))
+        labels_str = f" [{labels}]" if labels else ""
+        lines.append(f"#{idx}: {title}{labels_str}")
+    return "\n".join(lines)
+
+
+def issue_details(index: int) -> str:
+    """Retrieves the details of a specific Gitea issue.
+
+    Args:
+        index: The index number of the issue.
+    """
+    env = _load_env()
+    token = env.get("DEVELOPER_AGENT_TOKEN") or env.get("ADMIN_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+
+    issue = gitea_api.get_issue(token, owner, repo, index)
+    title = issue.get("title")
+    state = issue.get("state")
+    body = issue.get("body") or "No description provided."
+    labels = ", ".join(l.get("name") for l in issue.get("labels", []))
+    labels_str = f" [{labels}]" if labels else ""
+
+    lines = [
+        f"Issue #{index}: {title}{labels_str}",
+        f"State: {state}",
+        f"Description:",
+        body
+    ]
+    return "\n".join(lines)
+
+
+def issue_close(index: int) -> str:
+    """Closes a Gitea issue.
+
+    Args:
+        index: The index number of the issue to close.
+    """
+    env = _load_env()
+    token = env.get("DEVELOPER_AGENT_TOKEN") or env.get("ADMIN_TOKEN") or env.get("REVIEWER_AGENT_TOKEN", "")
+    owner = env.get("REPO_OWNER", "admin")
+    repo = env.get("REPO_NAME", "friendly-davinci")
+    gitea_api.GITEA_URL = env.get("GITEA_URL", "http://localhost:3000")
+
+    gitea_api.update_issue(token, owner, repo, index, state="closed")
+    return f"Issue #{index} closed successfully."
+
+
+def issue_dedup() -> str:
+    """Analyze open Gitea issues and suggest duplicates."""
+    from gitea_skills.dedup_issues import run_dedup
+    return run_dedup()
+
+

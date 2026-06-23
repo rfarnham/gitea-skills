@@ -23,9 +23,11 @@ All commands use the `gitea-skills` CLI tool which must be installed (`pip insta
 
 - **Always use the CLI**: Execute all Gitea operations through the `gitea-skills` CLI.
   Do NOT call Gitea APIs directly.
-- **Branch naming**: Use the format `agent/<ticket>-<slug>` for feature branches.
+- **Branch naming**: Use the format `agent/<ticket>-<slug>` or `agent/issue-<index>` for feature branches.
 - **Commits**: Follow Conventional Commits format.
 - **Cleanup**: Always remove worktrees after a branch is merged.
+- **No Silent Merges**: Never merge Gitea PRs automatically unless explicitly instructed. Always submit PRs and wait for human review or reviewer-agent approval.
+- **Issues as Source of Truth**: Retrieve tasks, bug reports, and features from Gitea Issues. Subagents should open issues directly in Gitea when bugs or new requests are discovered.
 
 ## Available Commands
 
@@ -34,6 +36,28 @@ All commands use the `gitea-skills` CLI tool which must be installed (`pip insta
 Create a new repository on Gitea:
 ```bash
 gitea-skills repo create <name> [--description "desc"] [--private] [--auto-init] [--owner <owner>] [--set-origin]
+```
+
+### Issue Management
+
+Create a new issue on Gitea:
+```bash
+gitea-skills issue create --title <title> --body <body> [--labels <label1> <label2>]
+```
+
+List open/closed issues:
+```bash
+gitea-skills issue list [--state open|closed|all]
+```
+
+View details of a specific issue:
+```bash
+gitea-skills issue details <index>
+```
+
+Close an issue:
+```bash
+gitea-skills issue close <index>
 ```
 
 ### Worktree Management
@@ -112,6 +136,8 @@ python -m gitea_skills.install --target-dir /path/to/project
 
 ## Conventions
 
-- **Branch Naming**: Use the format `agent/<ticket>-<slug>`.
+- **Branch Naming**: Use the format `agent/<ticket>-<slug>` or `agent/issue-<index>`.
 - **Commits**: Follow Conventional Commits format.
 - **Cleanup**: Always call `gitea-skills worktree remove` after a branch is merged.
+- **Reviews**: Always request approval from a human reviewer or reviewer-agent before merging any PR.
+

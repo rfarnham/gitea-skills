@@ -200,3 +200,57 @@ def set_commit_status(token, owner, repo, sha, state, description, context="ci")
         "description": description,
         "context": context,
     })
+
+
+# ---------------------------------------------------------------------------
+# Issues
+# ---------------------------------------------------------------------------
+
+def create_issue(token, owner, repo, title, body, labels=None):
+    """Create a new Gitea issue."""
+    return _request("POST", f"/repos/{owner}/{repo}/issues", token, {
+        "title": title,
+        "body": body,
+        "labels": labels or [],
+    })
+
+
+def list_issues(token, owner, repo, state="open", type="issues"):
+    """List Gitea issues in a repository."""
+    return _request("GET", f"/repos/{owner}/{repo}/issues?state={state}&type={type}", token)
+
+
+def get_issue(token, owner, repo, index):
+    """Get a single Gitea issue by number."""
+    return _request("GET", f"/repos/{owner}/{repo}/issues/{index}", token)
+
+
+def update_issue(token, owner, repo, index, state=None, title=None, body=None):
+    """Update a Gitea issue."""
+    payload = {}
+    if state is not None:
+        payload["state"] = state
+    if title is not None:
+        payload["title"] = title
+    if body is not None:
+        payload["body"] = body
+    return _request("PATCH", f"/repos/{owner}/{repo}/issues/{index}", token, payload)
+
+
+# ---------------------------------------------------------------------------
+# Labels
+# ---------------------------------------------------------------------------
+
+def list_repo_labels(token, owner, repo):
+    """List labels in a repository."""
+    return _request("GET", f"/repos/{owner}/{repo}/labels", token)
+
+
+def create_repo_label(token, owner, repo, name, color="#357dec"):
+    """Create a new label in a repository."""
+    return _request("POST", f"/repos/{owner}/{repo}/labels", token, {
+        "name": name,
+        "color": color,
+    })
+
+
