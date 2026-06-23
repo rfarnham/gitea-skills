@@ -380,6 +380,17 @@ def repo_create(name: str, description: str = "", private: bool = False, auto_in
     clone_url = res.get("clone_url")
     msg = f"Repository '{name}' created successfully! Clone URL: {clone_url}"
     
+    # Automatically add developer-agent and reviewer-agent as collaborators if ADMIN_TOKEN is available
+    admin_token = env.get("ADMIN_TOKEN")
+    if admin_token:
+        repo_owner = res.get("owner", {}).get("username") or owner or env.get("REPO_OWNER") or "admin"
+        try:
+            gitea_api.add_collaborator(admin_token, repo_owner, name, "developer-agent", "write")
+            gitea_api.add_collaborator(admin_token, repo_owner, name, "reviewer-agent", "write")
+            msg += "\nAdded 'developer-agent' and 'reviewer-agent' as collaborators with write permission."
+        except Exception as e:
+            msg += f"\nWarning: Could not configure agent collaborators: {e}"
+    
     if set_origin:
         # Check if inside git repository
         current_dir = Path.cwd().resolve()
