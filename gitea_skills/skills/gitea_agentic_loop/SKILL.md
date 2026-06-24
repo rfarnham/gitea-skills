@@ -9,135 +9,21 @@ description: >-
 
 # Gitea Agentic Development Loop
 
-This skill provides CLI commands for managing the local AI-driven development workflow.
-All commands use the `gitea-skills` CLI tool which must be installed (`pip install gitea-skills`).
+To prevent context pollution and excessive token usage in your primary conversation context, you MUST NOT execute Gitea CLI commands or manage the Gitea development loop directly if you are the main agent.
 
-## Prerequisites
+Instead, you MUST delegate this task to a subagent:
+1. Call the `invoke_subagent` tool with `TypeName: "self"` (or `"research"`).
+2. Set the `Role` to `"Gitea Loop Automation"`.
+3. Provide a prompt instructing the subagent to read the CLI reference file and execute the Gitea task.
 
-1. The `gitea-skills` package must be installed: `pip install gitea-skills`
-2. The global Gitea tokens must be configured in `~/.gitea_skills.env`.
-   Run `python -m gitea_skills.install --target-dir <project>` to generate the template and project scaffolding.
-3. Docker must be running with the Gitea containers (see the project's `docker-compose.yml`).
+Example Prompt for the Subagent:
+> "Read the Gitea reference document at `/Users/rfarnham/.gemini/config/plugins/gitea-skills/skills/gitea_agentic_loop/references/GITEA_CLI.md`. Then use the `gitea-skills` CLI to check CI status for the current branch."
 
-## Core Rules
+Wait for the subagent to finish and report back, then relay the summary to the user.
 
-- **Always use the CLI**: Execute all Gitea operations through the `gitea-skills` CLI.
-  Do NOT call Gitea APIs directly.
-- **Branch naming**: Use the format `agent/<ticket>-<slug>` or `agent/issue-<index>` for feature branches.
-- **Commits**: Follow Conventional Commits format.
-- **Cleanup**: Always remove worktrees after a branch is merged.
-- **No Silent Merges**: Never merge Gitea PRs automatically unless explicitly instructed. Always submit PRs and wait for human review or reviewer-agent approval.
-- **Issues as Source of Truth**: Retrieve tasks, bug reports, and features from Gitea Issues. Subagents should open issues directly in Gitea when bugs or new requests are discovered.
+## Rules for Subagents
 
-## Available Commands
-
-### Repository Management
-
-Create a new repository on Gitea:
-```bash
-gitea-skills repo create <name> [--description "desc"] [--private] [--auto-init] [--owner <owner>] [--set-origin]
-```
-
-### Issue Management
-
-Create a new issue on Gitea:
-```bash
-gitea-skills issue create --title <title> --body <body> [--labels <label1> <label2>]
-```
-
-List open/closed issues:
-```bash
-gitea-skills issue list [--state open|closed|all]
-```
-
-View details of a specific issue:
-```bash
-gitea-skills issue details <index>
-```
-
-Close an issue:
-```bash
-gitea-skills issue close <index>
-```
-
-### Worktree Management
-
-Create an isolated workspace for a feature branch:
-```bash
-gitea-skills worktree create <branch-name>
-```
-
-Remove a worktree after the branch is merged:
-```bash
-gitea-skills worktree remove <branch-name>
-```
-
-### Pull Request Management
-
-Create a PR on Gitea from the feature branch to main:
-```bash
-gitea-skills pr create --branch <branch-name> --title "feat: add feature" --body "Description"
-```
-
-View PR diff:
-```bash
-gitea-skills pr diff <pr_index>
-```
-
-View PR details:
-```bash
-gitea-skills pr details <pr_index>
-```
-
-View PR comments:
-```bash
-gitea-skills pr comments <pr_index> [--json]
-```
-
-View PR reviews:
-```bash
-gitea-skills pr reviews <pr_index> [--json]
-```
-
-### Code Review
-
-Submit a review on a PR:
-```bash
-gitea-skills review submit <pr_index> APPROVED|REQUEST_CHANGES|COMMENT "Review body"
-```
-
-### Merging
-
-Merge a PR:
-```bash
-gitea-skills merge <pr_index> --style merge|rebase|squash
-```
-
-### CI Status
-
-Check CI status for a branch or commit:
-```bash
-gitea-skills ci status <branch-or-sha>
-```
-
-### GitHub Sync
-
-Push to GitHub and create a PR:
-```bash
-gitea-skills push-to-github [github-repo-url]
-```
-
-### Project Setup
-
-Initialize a project for the gitea dev loop:
-```bash
-python -m gitea_skills.install --target-dir /path/to/project
-```
-
-## Conventions
-
-- **Branch Naming**: Use the format `agent/<ticket>-<slug>` or `agent/issue-<index>`.
-- **Commits**: Follow Conventional Commits format.
-- **Cleanup**: Always call `gitea-skills worktree remove` after a branch is merged.
-- **Reviews**: Always request approval from a human reviewer or reviewer-agent before merging any PR.
-
+If you are already running as a subagent (i.e. you were spawned by another agent with the role "Gitea Loop Automation" or specifically to perform a Gitea action):
+1. Do NOT delegate further.
+2. Immediately read the Gitea reference document at `/Users/rfarnham/.gemini/config/plugins/gitea-skills/skills/gitea_agentic_loop/references/GITEA_CLI.md` to load the CLI documentation.
+3. Execute the requested Gitea CLI commands.
