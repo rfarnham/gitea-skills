@@ -76,9 +76,9 @@ gitea-skills push-to-github git@github.com:<you>/<repo>.git
 │   ├── install.py              # Project setup / plugin registration
 │   └── skills/
 │       └── gitea_agentic_loop/
-│           ├── SKILL.md        # Agent-facing skill instructions
-│           └── scripts/
-│               └── push_to_github.sh
+│           ├── SKILL.md        # Agent router — delegates to subagent
+│           └── references/
+│               └── GITEA_CLI.md  # Full CLI docs loaded by subagent only
 ├── scripts/
 │   ├── setup.sh                # One-command bootstrap
 │   ├── run_developer.py        # Developer agent launcher
